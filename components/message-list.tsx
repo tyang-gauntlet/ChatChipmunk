@@ -48,41 +48,36 @@ export const MessageList = ({ channelId, parentId = null, receiverId = null, onR
     }, [channelId, receiverId, parentId])
 
     useEffect(() => {
-        const id = channelId || receiverId || parentId;
-        let filter = '';
-        if (channelId) {
-            filter = `channel_id=eq.${id}`;
-        } else if (receiverId) {
-            filter = `user_id=eq.${id}`;
-        } else if (parentId) {
-            filter = `parent_id=eq.${id}`;
-        }
+        const id = channelId || parentId;
         if (!id) return;
 
-        console.log('Subscribing to messages for:', id);
-
         const channel = supabase
-            .channel(`messages:${id}`)
+            .channel(`public:messages:${id}`)
             .on('postgres_changes', {
                 event: '*',
                 schema: 'public',
                 table: 'messages',
-                filter: filter
+                filter: channelId
+                    ? `channel_id=eq.${id}`
+                    : `parent_id=eq.${id}`
             }, (payload) => {
                 if (payload.eventType === 'INSERT') {
                     setMessages(prev => [...prev, payload.new as Message]);
-                    setTimeout(() => scrollToBottom(), 100);
+                    setTimeout(scrollToBottom, 100);
                 } else if (payload.eventType === 'DELETE') {
                     setMessages(prev => prev.filter(msg => msg.id !== payload.old.id));
+                } else if (payload.eventType === 'UPDATE') {
+                    setMessages(prev => prev.map(msg =>
+                        msg.id === payload.new.id ? { ...msg, ...payload.new } : msg
+                    ));
                 }
             })
-            .subscribe((status) => {
-            });
+            .subscribe()
 
         return () => {
-            supabase.removeChannel(channel);
-        };
-    }, [channelId, receiverId, parentId, supabase]);
+            supabase.removeChannel(channel)
+        }
+    }, [channelId, parentId, supabase])
 
     if (isLoading) {
         return <div>Loading...</div>

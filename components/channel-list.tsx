@@ -48,7 +48,7 @@ export function ChannelList({ onChannelSelect }: ChannelListProps) {
 
     useEffect(() => {
         const channel = supabase
-            .channel('channels')
+            .channel('public:channels')
             .on('postgres_changes', {
                 event: '*',
                 schema: 'public',

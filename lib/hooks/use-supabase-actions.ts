@@ -207,21 +207,36 @@ export const useSupabase = () => {
 
     // Reactions
     const addReaction = useCallback(async (messageId: string, emoji: string) => {
-        const { data: user } = await supabase.auth.getUser();
-        if (!user.user) throw new Error('Not authenticated');
+        try {
+            const { data: { user }, error: authError } = await supabase.auth.getUser()
+            if (authError || !user) throw new Error('Not authenticated')
 
-        const { data, error } = await supabase
-            .from('reactions')
-            .insert({
-                message_id: messageId,
-                user_id: user.user.id,
-                emoji,
-            })
-            .select()
-            .single();
-        if (error) throw error;
-        return data;
-    }, [supabase]);
+            const { data, error } = await supabase
+                .from('reactions')
+                .insert({
+                    message_id: messageId,
+                    user_id: user.id,
+                    emoji
+                })
+                .select('id, emoji')
+                .single()
+
+            if (error) throw error
+
+            // Return formatted reaction
+            return {
+                id: data.id,
+                emoji: data.emoji,
+                users: [{
+                    id: user.id,
+                    fullName: user.email // We'll use email as fallback
+                }]
+            }
+        } catch (error) {
+            console.error('Error adding reaction:', error)
+            throw error
+        }
+    }, [supabase])
 
     const removeReaction = useCallback(async (reactionId: string) => {
         const { error } = await supabase
@@ -282,17 +297,26 @@ export const useSupabase = () => {
     }, [supabase]);
 
     const getUsers = useCallback(async (): Promise<DBUser[]> => {
-        const { data: users, error } = await supabase
-            .from('users')
-            .select('*')
-            .order('email')
+        try {
+            const { data: { user } } = await supabase.auth.getUser()
+            if (!user) throw new Error('Not authenticated')
 
-        if (error) {
+            const { data: users, error } = await supabase
+                .from('users')
+                .select('*')
+                .neq('id', user.id) // Don't include current user
+                .order('email')
+
+            if (error) {
+                console.error('Error fetching users:', error)
+                throw error
+            }
+
+            return users as DBUser[]
+        } catch (error) {
             console.error('Error fetching users:', error)
             throw error
         }
-
-        return users as DBUser[]
     }, [supabase])
 
 

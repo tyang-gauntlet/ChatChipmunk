@@ -4,19 +4,22 @@ import { DBUser } from "@/lib/types"
 import { useEffect, useState } from "react"
 import { useSupabase } from "@/lib/hooks/use-supabase-actions"
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar"
+import { cn } from "@/lib/utils"
 
 interface DirectMessageListProps {
     onUserSelect: (user: DBUser) => void
+    selectedUser?: DBUser | null
 }
 
-export const DirectMessageList = ({ onUserSelect }: DirectMessageListProps) => {
+export const DirectMessageList = ({ onUserSelect, selectedUser }: DirectMessageListProps) => {
     const [users, setUsers] = useState<DBUser[]>([])
     const [isLoading, setIsLoading] = useState(true)
-    const { getUsers } = useSupabase()
+    const { getUsers, supabase } = useSupabase()
 
     useEffect(() => {
         const fetchUsers = async () => {
             try {
+                setIsLoading(true)
                 const users = await getUsers()
                 setUsers(users)
             } catch (error) {
@@ -27,10 +30,36 @@ export const DirectMessageList = ({ onUserSelect }: DirectMessageListProps) => {
         }
 
         fetchUsers()
-    }, [])
+    }, [getUsers])
+
+    // Subscribe to user presence changes
+    useEffect(() => {
+        const channel = supabase
+            .channel('public:users')
+            .on('postgres_changes', {
+                event: '*',
+                schema: 'public',
+                table: 'users'
+            }, (payload) => {
+                if (payload.eventType === 'INSERT') {
+                    setUsers(prev => [...prev, payload.new as DBUser])
+                } else if (payload.eventType === 'UPDATE') {
+                    setUsers(prev => prev.map(user =>
+                        user.id === payload.new.id ? { ...user, ...payload.new } : user
+                    ))
+                } else if (payload.eventType === 'DELETE') {
+                    setUsers(prev => prev.filter(user => user.id !== payload.old.id))
+                }
+            })
+            .subscribe()
+
+        return () => {
+            supabase.removeChannel(channel)
+        }
+    }, [supabase])
 
     if (isLoading) {
-        return <div className="px-4 py-2 text-sm text-muted-foreground">Loading...</div>
+        return <div className="px-4 py-2 text-sm text-muted-foreground">Loading users...</div>
     }
 
     if (!users.length) {
@@ -43,7 +72,10 @@ export const DirectMessageList = ({ onUserSelect }: DirectMessageListProps) => {
                 <button
                     key={user.id}
                     onClick={() => onUserSelect(user)}
-                    className="w-full flex items-center gap-2 px-4 py-1.5 hover:bg-accent rounded-md"
+                    className={cn(
+                        "w-full flex items-center gap-2 px-4 py-1.5 hover:bg-accent rounded-md",
+                        selectedUser?.id === user.id && "bg-accent"
+                    )}
                 >
                     <Avatar className="h-6 w-6">
                         <AvatarImage src={user.avatar_url} />
@@ -51,9 +83,14 @@ export const DirectMessageList = ({ onUserSelect }: DirectMessageListProps) => {
                             {user.email?.[0].toUpperCase() || ''}
                         </AvatarFallback>
                     </Avatar>
-                    <span className="text-sm truncate">
-                        {user.email}
-                    </span>
+                    <div className="flex flex-col items-start text-sm">
+                        <span className="truncate">{user.email}</span>
+                        {user.status && (
+                            <span className="text-xs text-muted-foreground">
+                                {user.status}
+                            </span>
+                        )}
+                    </div>
                 </button>
             ))}
         </div>

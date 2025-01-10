@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Avatar } from './ui/avatar'
 import { Button } from './ui/button'
 import { SmileIcon, MessageSquareIcon } from 'lucide-react'
@@ -8,6 +8,13 @@ import { Popover, PopoverContent, PopoverTrigger } from './ui/popover'
 import data from '@emoji-mart/data'
 import Picker from '@emoji-mart/react'
 import { format } from 'date-fns'
+import { useSupabase } from '@/lib/hooks/use-supabase-actions'
+
+interface Reaction {
+    id: string
+    emoji: string
+    users: { id: string; fullName: string }[]
+}
 
 interface MessageProps {
     id: string
@@ -19,10 +26,7 @@ interface MessageProps {
         fullName: string
         avatarUrl?: string
     }
-    reactions: {
-        emoji: string
-        users: { id: string; fullName: string }[]
-    }[]
+    reactions: Reaction[]
     replyCount: number
     onReply: (messageId: string) => void
 }
@@ -33,25 +37,52 @@ export const Message = ({
     attachments,
     createdAt,
     user,
-    reactions,
+    reactions: initialReactions = [],
     replyCount,
     onReply,
 }: MessageProps) => {
     const [showActions, setShowActions] = useState(false)
-    // const { addReaction, removeReaction } = useSupabase()
+    const [currentReactions, setCurrentReactions] = useState<Reaction[]>(initialReactions)
+    const { supabase, addReaction, removeReaction } = useSupabase()
 
-    // const handleReaction = async (emoji: string) => {
-    //     try {
-    //         const existingReaction = reactions.find(r => r.emoji === emoji)
-    //         if (existingReaction) {
-    //             await removeReaction(existingReaction.id)
-    //         } else {
-    //             await addReaction(id, emoji)
-    //         }
-    //     } catch (error) {
-    //         console.error('Failed to handle reaction:', error)
-    //     }
-    // }
+    useEffect(() => {
+        const channel = supabase
+            .channel(`public:reactions:${id}`)
+            .on('postgres_changes', {
+                event: '*',
+                schema: 'public',
+                table: 'reactions',
+                filter: `message_id=eq.${id}`
+            }, (payload: any) => {
+                if (payload.eventType === 'INSERT') {
+                    setCurrentReactions(prev => [...prev, payload.new])
+                } else if (payload.eventType === 'DELETE') {
+                    setCurrentReactions(prev => prev.filter(r => r.id !== payload.old.id))
+                }
+            })
+            .subscribe()
+
+        return () => {
+            supabase.removeChannel(channel)
+        }
+    }, [id, supabase])
+
+    const handleReaction = async (emoji: string) => {
+        try {
+            const existingReaction = currentReactions?.find(r => r.emoji === emoji)
+            if (existingReaction) {
+                await removeReaction(existingReaction.id)
+                setCurrentReactions(prev => prev.filter(r => r.id !== existingReaction.id))
+            } else {
+                const newReaction = await addReaction(id, emoji)
+                if (newReaction) {
+                    setCurrentReactions(prev => [...prev, newReaction])
+                }
+            }
+        } catch (error) {
+            console.error('Failed to handle reaction:', error)
+        }
+    }
 
     return (
         <div
@@ -90,9 +121,9 @@ export const Message = ({
                     </div>
                 )}
 
-                {(reactions?.length > 0 || replyCount > 0) && (
+                {(currentReactions?.length > 0 || replyCount > 0) && (
                     <div className="flex items-center gap-2 text-xs text-muted-foreground mt-2">
-                        {/* {reactions.map((reaction, i) => (
+                        {currentReactions.map((reaction, i) => (
                             <button
                                 key={i}
                                 className="flex items-center gap-1 bg-accent rounded-full px-2 py-1"
@@ -100,7 +131,7 @@ export const Message = ({
                             >
                                 {reaction.emoji} {reaction.users.length}
                             </button>
-                        ))} */}
+                        ))}
                         {replyCount > 0 && (
                             <button
                                 className="flex items-center gap-1"
@@ -123,10 +154,10 @@ export const Message = ({
                             </Button>
                         </PopoverTrigger>
                         <PopoverContent className="w-auto p-0">
-                            {/* <Picker
+                            <Picker
                                 data={data}
                                 onEmojiSelect={(emoji: any) => handleReaction(emoji.native)}
-                            /> */}
+                            />
                         </PopoverContent>
                     </Popover>
 
