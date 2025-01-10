@@ -18,14 +18,21 @@ import {
 } from "@/components/ui/command"
 import { Search } from "lucide-react"
 import { useState, useEffect } from "react"
-// import { MessageInput } from '@/components/message-input'
-// import { MessageList } from '@/components/message-list'
+import { MessageInput } from '@/components/message-input'
+import { MessageList } from '@/components/message-list'
 import { Plus } from "lucide-react"
 import { CreateChannelDialog } from "@/components/create-channel-dialog"
+import { Channel } from "@/lib/types"
 
 export default function Home() {
   const [open, setOpen] = useState(false)
   const [selectedThread, setSelectedThread] = useState<string | null>(null)
+  const [currentChannel, setCurrentChannel] = useState<Channel | null>(null)
+
+  const handleChannelSelect = (channel: Channel) => {
+    setCurrentChannel(channel)
+    setSelectedThread(null) // Reset thread when changing channels
+  }
 
   return (
     <div className="flex flex-col h-screen w-full">
@@ -70,7 +77,7 @@ export default function Home() {
           <ScrollArea className="flex-1">
             <div className="space-y-4 py-4">
               <div className="px-3 py-2">
-                <Collapsible>
+                <Collapsible defaultOpen>
                   <div className="flex items-center justify-between px-4 py-1">
                     <CollapsibleTrigger className="flex items-center hover:bg-accent rounded-md">
                       <ChevronRight className="h-3.5 w-3.5 shrink-0 transition-transform duration-200 collapsible-rotate" />
@@ -88,7 +95,7 @@ export default function Home() {
                     </CreateChannelDialog>
                   </div>
                   <CollapsibleContent className="mt-1">
-                    <ChannelList />
+                    <ChannelList onChannelSelect={handleChannelSelect} />
                   </CollapsibleContent>
                 </Collapsible>
               </div>
@@ -109,38 +116,44 @@ export default function Home() {
 
         {/* Message Area */}
         <main className="flex-1 flex flex-col min-w-0">
-          {/* Channel/User header */}
+          {/* Channel header */}
           <div className="border-b p-4">
-            <h2 className="font-semibold"># general</h2>
+            <h2 className="font-semibold">
+              {currentChannel ? `# ${currentChannel.name}` : 'Select a channel'}
+            </h2>
           </div>
 
-          <div className="flex-1 flex min-h-0">
-            <div className="flex-1 flex flex-col">
-              {/* <MessageList
-                channelId="current-channel-id"
-                onReply={(messageId) => setSelectedThread(messageId)}
-              />
-              <MessageInput
-                channelId="current-channel-id"
-              /> */}
-            </div>
-
-            {selectedThread && (
-              <div className="w-96 border-l flex flex-col">
-                <div className="p-4 border-b">
-                  <h3 className="font-semibold">Thread</h3>
-                </div>
-                {/* <MessageList
-                  parentId={selectedThread}
-                  onReply={() => { }}
+          {currentChannel ? (
+            <div className="flex-1 flex min-h-0">
+              <div className="flex-1 flex flex-col">
+                <MessageList
+                  channelId={currentChannel.id}
+                  onReply={(messageId) => setSelectedThread(messageId)}
                 />
-                <MessageInput
-                  channelId="current-channel-id"
-                  parentId={selectedThread}
-                /> */}
+                <MessageInput channelId={currentChannel.id} />
               </div>
-            )}
-          </div>
+
+              {selectedThread && (
+                <div className="w-96 border-l flex flex-col">
+                  <div className="p-4 border-b">
+                    <h3 className="font-semibold">Thread</h3>
+                  </div>
+                  {/* <MessageList
+                    parentId={selectedThread}
+                    onReply={() => { }}
+                  />
+                  <MessageInput
+                    channelId="current-channel-id"
+                    parentId={selectedThread}
+                  /> */}
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="flex-1 flex items-center justify-center text-muted-foreground">
+              Select a channel to start messaging
+            </div>
+          )}
         </main>
       </div>
     </div>

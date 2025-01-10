@@ -90,7 +90,7 @@ export const Message = ({
                     </div>
                 )}
 
-                {(reactions.length > 0 || replyCount > 0) && (
+                {(reactions?.length > 0 || replyCount > 0) && (
                     <div className="flex items-center gap-2 text-xs text-muted-foreground mt-2">
                         {/* {reactions.map((reaction, i) => (
                             <button

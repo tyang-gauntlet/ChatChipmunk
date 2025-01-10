@@ -7,12 +7,26 @@ export const useSupabase = () => {
 
     // Channels
     const getChannels = useCallback(async () => {
-        const { data, error } = await supabase
-            .from('channels')
-            .select('*, channel_members(user_id)')
-            .order('created_at', { ascending: true });
-        if (error) throw error;
-        return data;
+        try {
+            const { data, error } = await supabase
+                .from('channels')
+                .select(`
+                    id,
+                    name,
+                    description,
+                    is_private,
+                    created_by,
+                    created_at,
+                    channel_members (user_id)
+                `)
+                .order('created_at', { ascending: true });
+
+            if (error) throw error;
+            return data;
+        } catch (error) {
+            console.error('Error fetching channels:', error);
+            return [];
+        }
     }, [supabase]);
 
     const createChannel = useCallback(async (name: string, description: string) => {
@@ -20,36 +34,29 @@ export const useSupabase = () => {
             const { data: user } = await supabase.auth.getUser();
             if (!user.user) throw new Error('Not authenticated');
 
-            // Normalize channel name
-            const normalizedName = name.toLowerCase().trim();
-
-            // Check if channel exists using case-insensitive search
-            const { data: existingChannels, error: searchError } = await supabase
-                .from('channels')
-                .select('id')
-                .ilike('name', normalizedName)
-                .limit(1);
-
-            if (searchError) {
-                throw new Error('Failed to check for existing channel');
-            }
-
-            if (existingChannels?.length > 0) {
-                throw new Error('Channel with this name already exists');
-            }
-
             // Create channel
             const { data: channel, error: insertError } = await supabase
                 .from('channels')
                 .insert({
-                    name: normalizedName,
+                    name: name.toLowerCase().trim(),
+                    description,
+                    created_by: user.user.id,
+                    is_private: false
                 })
                 .select()
                 .single();
 
-            if (insertError) {
-                throw new Error('Failed to create channel');
-            }
+            if (insertError) throw insertError;
+
+            // Add creator as channel member
+            const { error: memberError } = await supabase
+                .from('channel_members')
+                .insert({
+                    channel_id: channel.id,
+                    user_id: user.user.id
+                });
+
+            if (memberError) throw memberError;
 
             return channel;
         } catch (error) {
@@ -68,20 +75,20 @@ export const useSupabase = () => {
 
     // Messages
     const getMessages = useCallback(async (channelId: string) => {
-        const { data, error } = await supabase
-            .from('messages')
-            .select(`
-                *,
-                users (id, full_name, avatar_url),
-                reactions (
-                    *,
-                    users (id, full_name)
-                )
-            `)
-            .eq('channel_id', channelId)
-            .order('created_at', { ascending: true });
-        if (error) throw error;
-        return data;
+        try {
+            const { data, error } = await supabase
+                .from('messages')
+                .select(`*`)
+                .eq('channel_id', channelId)
+                .order('created_at', { ascending: true })
+
+            if (error) throw error;
+
+            return data;
+        } catch (error) {
+            console.error('Error fetching messages:', error);
+            throw error;
+        }
     }, [supabase]);
 
     const getThreadMessages = useCallback(async (parentId: string) => {
@@ -99,27 +106,34 @@ export const useSupabase = () => {
     }, [supabase]);
 
     const sendMessage = useCallback(async (
-        channelId: string,
         content: string,
+        channelId?: string,
         parentId?: string,
         attachments?: any[]
     ) => {
-        const { data: user } = await supabase.auth.getUser();
-        if (!user.user) throw new Error('Not authenticated');
+        try {
+            const { data: { user }, error: authError } = await supabase.auth.getUser();
+            if (authError || !user) throw new Error('Not authenticated');
 
-        const { data, error } = await supabase
-            .from('messages')
-            .insert({
-                channel_id: channelId,
-                user_id: user.user.id,
-                content,
-                parent_id: parentId,
-                attachments,
-            })
-            .select()
-            .single();
-        if (error) throw error;
-        return data;
+            const { data, error } = await supabase
+                .from('messages')
+                .insert({
+                    channel_id: channelId,
+                    content,
+                    user_id: user.id,
+                    parent_id: parentId,
+                    attachments,
+                    created_at: new Date().toISOString()
+                })
+                .select()
+                .single();
+
+            if (error) throw error;
+            return data;
+        } catch (error) {
+            console.error('Error sending message:', error);
+            throw error;
+        }
     }, [supabase]);
 
     // Direct Messages

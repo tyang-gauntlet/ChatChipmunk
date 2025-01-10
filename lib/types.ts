@@ -22,10 +22,10 @@ export interface Message {
 export interface Channel {
     id: string;
     name: string;
-    description: string | null;
+    description?: string;
     is_private: boolean;
-    created_by: string;
-    created_at: string;
+    created_by?: string;
+    created_at?: string;
 }
 
 export interface User {
