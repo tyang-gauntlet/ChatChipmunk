@@ -7,7 +7,6 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { cn } from "@/lib/utils"
 import { useRouter, usePathname } from "next/navigation"
 import { useSupabase } from "@/lib/hooks/use-supabase-actions"
-import { createClient } from '@/lib/hooks/use-supabase-client'
 import { Channel } from "@/lib/types"
 import {
     AlertDialog,
@@ -25,8 +24,7 @@ interface ChannelListProps {
 }
 
 export function ChannelList({ onChannelSelect }: ChannelListProps) {
-    const { getChannels, deleteChannel } = useSupabase()
-    const supabase = createClient()
+    const { getChannels, deleteChannel, supabase } = useSupabase()
     const [channels, setChannels] = useState<Channel[]>([])
     const [isLoading, setIsLoading] = useState(true)
     const pathname = usePathname()

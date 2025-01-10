@@ -1,10 +1,10 @@
-import { createClient } from '@supabase/supabase-js'
+import { useCallback } from 'react'
+import { getSupabaseClient } from '../supabase/client'
 import { Database } from '@/lib/database.types';
-import { useCallback } from 'react';
 import { DBUser } from '../types';
 
 export const useSupabase = () => {
-    const supabase = createClient<Database>(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
+    const supabase = getSupabaseClient();
 
     // Channels
     const getChannels = useCallback(async () => {

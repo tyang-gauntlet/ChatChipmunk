@@ -9,12 +9,12 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { createClient } from '@/lib/hooks/use-supabase-client'
+import { useSupabase } from '@/lib/hooks/use-supabase-actions'
 
 export function UserNav() {
     const [userInitial, setUserInitial] = useState("")
     const router = useRouter()
-    const supabase = createClient()
+    const { supabase } = useSupabase()
 
     useEffect(() => {
         const getUser = async () => {

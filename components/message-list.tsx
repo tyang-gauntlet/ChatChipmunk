@@ -4,7 +4,6 @@ import { useEffect, useRef, useState } from 'react'
 import { Message as MessageComponent } from './message'
 import type { Message } from '@/lib/types'
 import { useSupabase } from '@/lib/hooks/use-supabase-actions'
-import { createClient } from '@/lib/hooks/use-supabase-client'
 
 interface MessageListProps {
     channelId?: string | null
@@ -14,8 +13,7 @@ interface MessageListProps {
 }
 
 export const MessageList = ({ channelId, parentId = null, receiverId = null, onReply }: MessageListProps) => {
-    const { getMessages, getThreadMessages, getDirectMessages, addReaction, removeReaction } = useSupabase()
-    const supabase = createClient()
+    const { getMessages, getThreadMessages, getDirectMessages, supabase } = useSupabase()
     const messagesEndRef = useRef<HTMLDivElement>(null)
     const [messages, setMessages] = useState<Message[]>([])
     const [isLoading, setIsLoading] = useState(true)

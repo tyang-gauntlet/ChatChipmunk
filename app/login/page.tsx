@@ -1,16 +1,22 @@
 "use client"
-
+import { useEffect } from 'react'
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Label } from "@/components/ui/label"
 import { useAuth } from './actions'
-
-
 export default function LoginPage() {
     const { login, signup, isLoading } = useAuth()
-
+    // DELETE ANY COOKIES STARTING WITH base64-
+    useEffect(() => {
+        document.cookie.split(';').forEach(cookieString => {
+            const [cookieName, cookieValue] = cookieString.split('=')
+            if (cookieValue?.trim().startsWith('base64-')) {
+                document.cookie = cookieName.trim() + "=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;"
+            }
+        })
+    }, [])
     return (
         <div className="flex h-screen w-full items-center justify-center">
             <Card className="w-[400px]">
