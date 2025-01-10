@@ -43,13 +43,13 @@ export type Database = {
                     created_at: string
                 }
             }
-            channel_members: {
-                Row: {
-                    channel_id: string
-                    user_id: string
-                    joined_at: string
-                }
-            }
+            // channel_members: {
+            //     Row: {
+            //         channel_id: string
+            //         user_id: string
+            //         joined_at: string
+            //     }
+            // }
             direct_messages: {
                 Row: {
                     id: string

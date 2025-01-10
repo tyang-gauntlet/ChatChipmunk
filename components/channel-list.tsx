@@ -1,52 +1,45 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 import { Hash, Lock } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { cn } from "@/lib/utils"
 import { useRouter, usePathname } from "next/navigation"
+import { useSupabase } from "@/lib/hooks/use-supabase-actions"
 
-type Channel = {
+interface Channel {
     id: string
     name: string
     is_private: boolean
 }
 
 export function ChannelList() {
+    const { getChannels } = useSupabase()
     const [channels, setChannels] = useState<Channel[]>([])
+    const [isLoading, setIsLoading] = useState(true)
     const router = useRouter()
     const pathname = usePathname()
-    const supabase = createClientComponentClient()
 
     useEffect(() => {
         const fetchChannels = async () => {
-            const { data: channels, error } = await supabase
-                .from('channels')
-                .select('*')
-                .order('name')
-
-            if (!error && channels) {
-                setChannels(channels)
+            try {
+                setIsLoading(true)
+                const data = await getChannels()
+                setChannels(data || [])
+            } catch (error) {
+                console.error('Failed to fetch channels:', error)
+            } finally {
+                setIsLoading(false)
             }
         }
 
         fetchChannels()
+    }, [getChannels])
 
-        // Subscribe to channel changes
-        const channel = supabase
-            .channel('channel-changes')
-            .on('postgres_changes',
-                { event: '*', schema: 'public', table: 'channels' },
-                () => fetchChannels()
-            )
-            .subscribe()
-
-        return () => {
-            supabase.removeChannel(channel)
-        }
-    }, [supabase])
+    if (isLoading) {
+        return <div className="p-4">Loading channels...</div>
+    }
 
     return (
         <ScrollArea className="space-y-1">

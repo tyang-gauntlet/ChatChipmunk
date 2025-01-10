@@ -1,5 +1,5 @@
-import { Providers } from "@/components/providers"
 import "./globals.css"
+import { ThemeProvider } from "@/components/theme-provider"
 
 export const metadata = {
   title: 'ChatChipmunk',
@@ -17,9 +17,14 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body>
-        <Providers>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+        >
           {children}
-        </Providers>
+        </ThemeProvider>
       </body>
     </html>
   )

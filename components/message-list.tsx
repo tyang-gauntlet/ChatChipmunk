@@ -2,8 +2,8 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { Message as MessageComponent } from './message'
-import { useSupabase } from '@/lib/hooks/use-supabase'
 import type { Message } from '@/lib/types'
+import { useSupabase } from '@/lib/hooks/use-supabase-actions'
 
 interface MessageListProps {
     channelId?: string

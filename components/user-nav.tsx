@@ -1,7 +1,6 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 import { useRouter } from "next/navigation"
 import {
     DropdownMenu,
@@ -10,11 +9,12 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { createClient } from '@/lib/hooks/use-supabase-client'
 
 export function UserNav() {
     const [userInitial, setUserInitial] = useState("")
     const router = useRouter()
-    const supabase = createClientComponentClient()
+    const supabase = createClient()
 
     useEffect(() => {
         const getUser = async () => {
@@ -28,7 +28,7 @@ export function UserNav() {
 
     const handleSignOut = async () => {
         await supabase.auth.signOut()
-        router.push("/auth/login")
+        router.push("/login")
     }
 
     return (

@@ -3,7 +3,7 @@
 import { ModeToggle } from "@/components/mode-toggle"
 import { UserNav } from "@/components/user-nav"
 import { ChannelList } from "@/components/channel-list"
-import { DirectMessageList } from "@/components/direct-message-list"
+// import { DirectMessageList } from "@/components/direct-message-list"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { ChevronRight } from "lucide-react"
@@ -18,38 +18,14 @@ import {
 } from "@/components/ui/command"
 import { Search } from "lucide-react"
 import { useState, useEffect } from "react"
-import { MessageInput } from '@/components/message-input'
-import { MessageList } from '@/components/message-list'
-import { useSupabase } from '@/components/supabase-provider'
+// import { MessageInput } from '@/components/message-input'
+// import { MessageList } from '@/components/message-list'
 import { Plus } from "lucide-react"
 import { CreateChannelDialog } from "@/components/create-channel-dialog"
 
 export default function Home() {
   const [open, setOpen] = useState(false)
   const [selectedThread, setSelectedThread] = useState<string | null>(null)
-  const supabase = useSupabase()
-
-  useEffect(() => {
-    const down = (e: KeyboardEvent) => {
-      if (e.key === "k" && (e.metaKey || e.ctrlKey)) {
-        e.preventDefault()
-        setOpen((open) => !open)
-      }
-    }
-
-    document.addEventListener("keydown", down)
-    return () => document.removeEventListener("keydown", down)
-  }, [])
-
-  const handleSendMessage = async (content: string, attachments: string[]) => {
-    await supabase
-      .from('messages')
-      .insert({
-        content,
-        attachments,
-        channel_id: 'current-channel-id', // You'll need to track the current channel
-      })
-  }
 
   return (
     <div className="flex flex-col h-screen w-full">
@@ -123,7 +99,7 @@ export default function Home() {
                     <h2 className="text-sm font-semibold ml-1.5">Direct Messages</h2>
                   </CollapsibleTrigger>
                   <CollapsibleContent className="mt-1">
-                    <DirectMessageList />
+                    {/* <DirectMessageList /> */}
                   </CollapsibleContent>
                 </Collapsible>
               </div>
@@ -140,13 +116,13 @@ export default function Home() {
 
           <div className="flex-1 flex min-h-0">
             <div className="flex-1 flex flex-col">
-              <MessageList
+              {/* <MessageList
                 channelId="current-channel-id"
                 onReply={(messageId) => setSelectedThread(messageId)}
               />
               <MessageInput
                 channelId="current-channel-id"
-              />
+              /> */}
             </div>
 
             {selectedThread && (
@@ -154,14 +130,14 @@ export default function Home() {
                 <div className="p-4 border-b">
                   <h3 className="font-semibold">Thread</h3>
                 </div>
-                <MessageList
+                {/* <MessageList
                   parentId={selectedThread}
                   onReply={() => { }}
                 />
                 <MessageInput
                   channelId="current-channel-id"
                   parentId={selectedThread}
-                />
+                /> */}
               </div>
             )}
           </div>
