@@ -6,16 +6,68 @@ import { UserNav } from "@/components/user-nav"
 import { ChannelList } from "@/components/channel-list"
 import { DirectMessageList } from "@/components/direct-message-list"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Separator } from "@/components/ui/separator"
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
+import { ChevronRight } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import {
+  Command,
+  CommandDialog,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+  CommandShortcut,
+} from "@/components/ui/command"
+import { Search } from "lucide-react"
+import { useState, useEffect } from "react"
 
 export default function Home() {
+  const [open, setOpen] = useState(false)
+
+  useEffect(() => {
+    const down = (e: KeyboardEvent) => {
+      if (e.key === "k" && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault()
+        setOpen((open) => !open)
+      }
+    }
+
+    document.addEventListener("keydown", down)
+    return () => document.removeEventListener("keydown", down)
+  }, [])
+
   return (
     <div className="flex flex-col h-screen w-full">
       {/* Header - now at the very top */}
       <header className="border-b h-14 flex items-center px-6 justify-between bg-background z-10 w-full">
         <h1 className="font-semibold">ChatChipmunk</h1>
         <div className="flex-1 max-w-2xl mx-4">
-          <CommandSearch />
+          <Button
+            variant="outline"
+            className="relative w-full justify-start text-sm text-muted-foreground"
+            onClick={() => setOpen(true)}
+          >
+            <Search className="mr-2 h-4 w-4" />
+            Search channels and messages...
+            <kbd className="pointer-events-none absolute right-1.5 top-1.5 hidden h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium opacity-100 sm:flex">
+              ⌘K
+            </kbd>
+          </Button>
+          <CommandDialog open={open} onOpenChange={setOpen}>
+            <CommandInput placeholder="Search channels and messages..." />
+            <CommandList>
+              <CommandEmpty>No results found.</CommandEmpty>
+              <CommandGroup heading="Channels">
+                <CommandItem># general</CommandItem>
+                <CommandItem># random</CommandItem>
+              </CommandGroup>
+              <CommandGroup heading="Messages">
+                <CommandItem>Message from John</CommandItem>
+                <CommandItem>Message from Sarah</CommandItem>
+              </CommandGroup>
+            </CommandList>
+          </CommandDialog>
         </div>
         <div className="flex items-center gap-4">
           <ModeToggle />
@@ -30,13 +82,26 @@ export default function Home() {
           <ScrollArea className="flex-1">
             <div className="space-y-4 py-4">
               <div className="px-3 py-2">
-                <h2 className="mb-2 px-4 text-lg font-semibold">Channels</h2>
-                <ChannelList />
+                <Collapsible>
+                  <CollapsibleTrigger className="flex items-center w-full px-4 py-1 hover:bg-accent rounded-md">
+                    <ChevronRight className="h-3.5 w-3.5 shrink-0 transition-transform duration-200 collapsible-rotate" />
+                    <h2 className="text-sm font-semibold ml-1.5">Channels</h2>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="mt-1">
+                    <ChannelList />
+                  </CollapsibleContent>
+                </Collapsible>
               </div>
-              <Separator className="mx-3" />
               <div className="px-3 py-2">
-                <h2 className="mb-2 px-4 text-lg font-semibold">Direct Messages</h2>
-                <DirectMessageList />
+                <Collapsible>
+                  <CollapsibleTrigger className="flex items-center w-full px-4 py-1 hover:bg-accent rounded-md">
+                    <ChevronRight className="h-3.5 w-3.5 shrink-0 transition-transform duration-200 collapsible-rotate" />
+                    <h2 className="text-sm font-semibold ml-1.5">Direct Messages</h2>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="mt-1">
+                    <DirectMessageList />
+                  </CollapsibleContent>
+                </Collapsible>
               </div>
             </div>
           </ScrollArea>
