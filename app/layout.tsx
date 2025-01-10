@@ -1,5 +1,4 @@
-import { ThemeProvider } from "@/components/theme-provider"
-import { Toaster } from "sonner"
+import { Providers } from "@/components/providers"
 import "./globals.css"
 
 export const metadata = {
@@ -18,15 +17,9 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body>
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="system"
-          enableSystem
-          disableTransitionOnChange
-        >
+        <Providers>
           {children}
-          <Toaster />
-        </ThemeProvider>
+        </Providers>
       </body>
     </html>
   )
