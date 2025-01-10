@@ -1,9 +1,9 @@
 "use client"
 
-import { useEffect, useRef } from 'react'
-import { Message } from './message'
-import { useSupabaseClient } from '@supabase/auth-helpers-react'
-import { useInfiniteScroll } from '@/hooks/use-infinite-scroll'
+import { useEffect, useRef, useState } from 'react'
+import { Message as MessageComponent } from './message'
+import { useSupabase } from '@/lib/hooks/use-supabase'
+import type { Message } from '@/lib/types'
 
 interface MessageListProps {
     channelId?: string
@@ -13,65 +13,35 @@ interface MessageListProps {
 }
 
 export const MessageList = ({ channelId, receiverId, parentId, onReply }: MessageListProps) => {
-    const supabase = useSupabaseClient()
+    const { getMessages, getThreadMessages, getDirectMessages, addReaction, removeReaction } = useSupabase()
     const bottomRef = useRef<HTMLDivElement>(null)
+    const [messages, setMessages] = useState<Message[]>([])
+    const [isLoading, setIsLoading] = useState(true)
 
-    const { data: messages, isLoading, fetchNextPage } = useInfiniteScroll(
-        async ({ pageParam = 0 }) => {
-            const query = supabase
-                .from('messages')
-                .select(`
-          id,
-          content,
-          attachments,
-          created_at,
-          user:user_id(id, full_name, avatar_url),
-          reactions(emoji, user:user_id(id, full_name)),
-          threads:messages!parent_id(id)
-        `)
-                .order('created_at', { ascending: false })
-                .range(pageParam, pageParam + 49)
+    useEffect(() => {
+        const fetchMessages = async () => {
+            try {
+                setIsLoading(true)
+                let data: Message[] = []
 
-            if (channelId) {
-                query.eq('channel_id', channelId)
-            } else if (receiverId) {
-                query.eq('receiver_id', receiverId)
+                if (channelId) {
+                    data = await getMessages(channelId)
+                } else if (parentId) {
+                    data = await getThreadMessages(parentId)
+                } else if (receiverId) {
+                    data = await getDirectMessages(receiverId)
+                }
+
+                setMessages(data)
+            } catch (error) {
+                console.error('Failed to fetch messages:', error)
+            } finally {
+                setIsLoading(false)
             }
-            if (parentId) {
-                query.eq('parent_id', parentId)
-            } else {
-                query.is('parent_id', null)
-            }
-
-            const { data, error } = await query
-
-            if (error) throw error
-            return data
         }
-    )
 
-    const handleReaction = async (messageId: string, emoji: string) => {
-        const { data: existingReaction } = await supabase
-            .from('reactions')
-            .select()
-            .eq('message_id', messageId)
-            .eq('emoji', emoji)
-            .single()
-
-        if (existingReaction) {
-            await supabase
-                .from('reactions')
-                .delete()
-                .eq('id', existingReaction.id)
-        } else {
-            await supabase
-                .from('reactions')
-                .insert({
-                    message_id: messageId,
-                    emoji,
-                })
-        }
-    }
+        fetchMessages()
+    }, [channelId, receiverId, parentId])
 
     useEffect(() => {
         bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -84,17 +54,26 @@ export const MessageList = ({ channelId, receiverId, parentId, onReply }: Messag
     return (
         <div className="flex flex-col-reverse">
             <div ref={bottomRef} />
-            {messages?.pages.flat().map((message) => (
-                <Message
+            {messages.map((message) => (
+                <MessageComponent
                     key={message.id}
                     id={message.id}
                     content={message.content}
-                    attachments={message.attachments}
+                    attachments={message.attachments || []}
                     createdAt={message.created_at}
-                    user={message.user}
-                    reactions={message.reactions}
+                    user={{
+                        id: message.user.id,
+                        fullName: message.user.full_name,
+                        avatarUrl: message.user.avatar_url || undefined
+                    }}
+                    reactions={message.reactions.map(r => ({
+                        emoji: r.emoji,
+                        users: r.users.map(u => ({
+                            id: u.id,
+                            fullName: u.full_name
+                        }))
+                    }))}
                     replyCount={message.threads?.length || 0}
-                    onReaction={handleReaction}
                     onReply={onReply}
                 />
             ))}

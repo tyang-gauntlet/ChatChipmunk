@@ -21,6 +21,8 @@ import { useState, useEffect } from "react"
 import { MessageInput } from '@/components/message-input'
 import { MessageList } from '@/components/message-list'
 import { useSupabase } from '@/components/supabase-provider'
+import { Plus } from "lucide-react"
+import { CreateChannelDialog } from "@/components/create-channel-dialog"
 
 export default function Home() {
   const [open, setOpen] = useState(false)
@@ -93,10 +95,22 @@ export default function Home() {
             <div className="space-y-4 py-4">
               <div className="px-3 py-2">
                 <Collapsible>
-                  <CollapsibleTrigger className="flex items-center w-full px-4 py-1 hover:bg-accent rounded-md">
-                    <ChevronRight className="h-3.5 w-3.5 shrink-0 transition-transform duration-200 collapsible-rotate" />
-                    <h2 className="text-sm font-semibold ml-1.5">Channels</h2>
-                  </CollapsibleTrigger>
+                  <div className="flex items-center justify-between px-4 py-1">
+                    <CollapsibleTrigger className="flex items-center hover:bg-accent rounded-md">
+                      <ChevronRight className="h-3.5 w-3.5 shrink-0 transition-transform duration-200 collapsible-rotate" />
+                      <h2 className="text-sm font-semibold ml-1.5">Channels</h2>
+                    </CollapsibleTrigger>
+                    <CreateChannelDialog>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7"
+                        aria-label="Create channel"
+                      >
+                        <Plus className="h-4 w-4" />
+                      </Button>
+                    </CreateChannelDialog>
+                  </div>
                   <CollapsibleContent className="mt-1">
                     <ChannelList />
                   </CollapsibleContent>
@@ -130,7 +144,9 @@ export default function Home() {
                 channelId="current-channel-id"
                 onReply={(messageId) => setSelectedThread(messageId)}
               />
-              <MessageInput onSend={handleSendMessage} />
+              <MessageInput
+                channelId="current-channel-id"
+              />
             </div>
 
             {selectedThread && (
@@ -143,8 +159,8 @@ export default function Home() {
                   onReply={() => { }}
                 />
                 <MessageInput
+                  channelId="current-channel-id"
                   parentId={selectedThread}
-                  onSend={handleSendMessage}
                 />
               </div>
             )}

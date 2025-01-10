@@ -8,11 +8,12 @@ import { Popover, PopoverContent, PopoverTrigger } from './ui/popover'
 import data from '@emoji-mart/data'
 import Picker from '@emoji-mart/react'
 import { format } from 'date-fns'
+import { useSupabase } from '@/lib/hooks/use-supabase'
 
 interface MessageProps {
     id: string
     content: string
-    attachments: string[]
+    attachments: any[]
     createdAt: string
     user: {
         id: string
@@ -24,7 +25,6 @@ interface MessageProps {
         users: { id: string; fullName: string }[]
     }[]
     replyCount: number
-    onReaction: (messageId: string, emoji: string) => Promise<void>
     onReply: (messageId: string) => void
 }
 
@@ -36,10 +36,23 @@ export const Message = ({
     user,
     reactions,
     replyCount,
-    onReaction,
     onReply,
 }: MessageProps) => {
     const [showActions, setShowActions] = useState(false)
+    const { addReaction, removeReaction } = useSupabase()
+
+    const handleReaction = async (emoji: string) => {
+        try {
+            const existingReaction = reactions.find(r => r.emoji === emoji)
+            if (existingReaction) {
+                await removeReaction(existingReaction.id)
+            } else {
+                await addReaction(id, emoji)
+            }
+        } catch (error) {
+            console.error('Failed to handle reaction:', error)
+        }
+    }
 
     return (
         <div
@@ -84,7 +97,7 @@ export const Message = ({
                             <button
                                 key={i}
                                 className="flex items-center gap-1 bg-accent rounded-full px-2 py-1"
-                                onClick={() => onReaction(id, reaction.emoji)}
+                                onClick={() => handleReaction(reaction.emoji)}
                             >
                                 {reaction.emoji} {reaction.users.length}
                             </button>
@@ -113,7 +126,7 @@ export const Message = ({
                         <PopoverContent className="w-auto p-0">
                             <Picker
                                 data={data}
-                                onEmojiSelect={(emoji: any) => onReaction(id, emoji.native)}
+                                onEmojiSelect={(emoji: any) => handleReaction(emoji.native)}
                             />
                         </PopoverContent>
                     </Popover>

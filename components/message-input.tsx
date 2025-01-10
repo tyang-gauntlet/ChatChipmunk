@@ -4,21 +4,30 @@ import { useState } from 'react'
 import { Button } from './ui/button'
 import { SendIcon } from 'lucide-react'
 import { Input } from './ui/input'
+import { useSupabase } from '@/lib/hooks/use-supabase'
 
 interface MessageInputProps {
     channelId?: string
     receiverId?: string
     parentId?: string
-    onSend: (content: string, attachments: any[]) => Promise<void>
 }
 
-export const MessageInput = ({ onSend }: MessageInputProps) => {
+export const MessageInput = ({ channelId, receiverId, parentId }: MessageInputProps) => {
     const [message, setMessage] = useState('')
+    const { sendMessage, sendDirectMessage } = useSupabase()
 
     const handleSend = async () => {
         if (!message.trim()) return
-        await onSend(message, [])
-        setMessage('')
+        try {
+            if (channelId) {
+                await sendMessage(channelId, message, parentId)
+            } else if (receiverId) {
+                await sendDirectMessage(receiverId, message)
+            }
+            setMessage('')
+        } catch (error) {
+            console.error('Failed to send message:', error)
+        }
     }
 
     const handleKeyDown = (e: React.KeyboardEvent) => {
