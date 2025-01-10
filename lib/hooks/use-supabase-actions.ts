@@ -325,6 +325,93 @@ export const useSupabase = () => {
         }
     }, [supabase])
 
+    interface SearchResult {
+        type: 'message' | 'channel' | 'user'
+        id: string
+        content?: string
+        channelId?: string
+        parentId?: string
+        userId?: string
+        title: string
+        subtitle: string
+        timestamp?: string
+    }
+
+    const searchAll = useCallback(async (query: string): Promise<SearchResult[]> => {
+        if (!query.trim()) return []
+
+        try {
+            const [messagesRes, channelsRes, usersRes] = await Promise.all([
+                // Search messages using the custom function
+                supabase
+                    .rpc('search_messages', { search_query: query })
+                    .select(`
+                        id,
+                        content,
+                        channel_id,
+                        parent_id,
+                        created_at,
+                        user:user_id (id, email)
+                    `),
+
+                // Search channels
+                supabase
+                    .from('channels')
+                    .select('id, name, description')
+                    .textSearch('name', query, { type: 'plain' })
+                    .limit(5),
+
+                // Search users
+                supabase
+                    .from('users')
+                    .select('id, email, full_name')
+                    .textSearch('email', query, { type: 'plain' })
+                    .limit(5)
+            ])
+
+            const results: SearchResult[] = []
+
+            // Format message results
+            if (!messagesRes.error && messagesRes.data) {
+                results.push(...messagesRes.data.map(msg => ({
+                    type: 'message',
+                    id: msg.id,
+                    content: msg.content,
+                    channelId: msg.channel_id,
+                    parentId: msg.parent_id,
+                    userId: msg.user?.id,
+                    title: msg.content.substring(0, 50) + (msg.content.length > 50 ? '...' : ''),
+                    subtitle: `by ${msg.user?.email}`,
+                    timestamp: msg.created_at
+                })))
+            }
+
+            // Format channel results
+            if (!channelsRes.error && channelsRes.data) {
+                results.push(...channelsRes.data.map(channel => ({
+                    type: 'channel',
+                    id: channel.id,
+                    title: `#${channel.name}`,
+                    subtitle: channel.description || 'No description'
+                })))
+            }
+
+            // Format user results
+            if (!usersRes.error && usersRes.data) {
+                results.push(...usersRes.data.map(user => ({
+                    type: 'user',
+                    id: user.id,
+                    title: user.full_name || user.email,
+                    subtitle: user.full_name ? user.email : 'Direct Message'
+                })))
+            }
+
+            return results
+        } catch (error) {
+            console.error('Search error:', error)
+            return []
+        }
+    }, [supabase])
 
     return {
         supabase,
@@ -349,5 +436,6 @@ export const useSupabase = () => {
         updateUserStatus,
         searchUsers,
         getUsers,
+        searchAll,
     };
 }; 

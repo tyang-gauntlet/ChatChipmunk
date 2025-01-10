@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from 'react'
-import { Avatar } from './ui/avatar'
+import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar'
 import { Button } from './ui/button'
 import { SmileIcon, MessageSquareIcon } from 'lucide-react'
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover'
@@ -9,6 +9,7 @@ import data from '@emoji-mart/data'
 import Picker from '@emoji-mart/react'
 import { format } from 'date-fns'
 import { useSupabase } from '@/lib/hooks/use-supabase-actions'
+import MessageAttachment from './message-attachment'
 
 interface Reaction {
     id: string
@@ -90,13 +91,14 @@ export const Message = ({
             onMouseEnter={() => setShowActions(true)}
             onMouseLeave={() => setShowActions(false)}
         >
-            <Avatar className="h-8 w-8">
-                {!user.avatarUrl && (
-                    <div className="bg-primary text-primary-foreground rounded-full h-full w-full flex items-center justify-center">
-                        {user.fullName.split(' ').map(n => n[0]).join('')}
-                    </div>
-                )}
-            </Avatar>
+            <div className="relative">
+                <Avatar className="h-6 w-6">
+                    <AvatarImage src={user.avatarUrl} />
+                    <AvatarFallback className="text-xs">
+                        {(user.fullName || '?')[0]?.toUpperCase()}
+                    </AvatarFallback>
+                </Avatar>
+            </div>
 
             <div className="flex-1 space-y-1">
                 <div className="flex items-center gap-2">
@@ -108,38 +110,47 @@ export const Message = ({
 
                 <div dangerouslySetInnerHTML={{ __html: content }} />
 
-                {attachments.length > 0 && (
-                    <div className="flex flex-wrap gap-2 mt-2">
-                        {attachments.map((url, i) => (
-                            <img
-                                key={i}
-                                src={url}
-                                alt="attachment"
-                                className="rounded-md max-w-sm"
+                {attachments?.length > 0 && (
+                    <div className="flex flex-col gap-2 mt-2">
+                        {attachments.map(attachment => (
+                            <MessageAttachment
+                                key={attachment.id}
+                                attachment={attachment}
                             />
                         ))}
                     </div>
                 )}
 
                 {(currentReactions?.length > 0 || replyCount > 0) && (
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground mt-2">
-                        {currentReactions.map((reaction, i) => (
-                            <button
-                                key={i}
-                                className="flex items-center gap-1 bg-accent rounded-full px-2 py-1"
-                                onClick={() => handleReaction(reaction.emoji)}
-                            >
-                                {reaction.emoji} {reaction.users.length}
-                            </button>
-                        ))}
+                    <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground mt-2">
+                        <div className="flex flex-wrap gap-1">
+                            {currentReactions.map((reaction) => (
+                                <div key={reaction.id} className="flex flex-col items-center">
+                                    <button
+                                        className="flex items-center gap-1 bg-accent rounded-full px-2 py-1 hover:bg-accent/80"
+                                        onClick={() => handleReaction(reaction.emoji)}
+                                    >
+                                        <span>{reaction.emoji}</span>
+                                    </button>
+                                    <span className="text-[10px] text-muted-foreground mt-0.5">
+                                        {reaction.users?.length || 0}
+                                    </span>
+                                </div>
+                            ))}
+                        </div>
                         {replyCount > 0 && (
-                            <button
-                                className="flex items-center gap-1"
-                                onClick={() => onReply(id)}
-                            >
-                                <MessageSquareIcon className="h-3 w-3" />
-                                {replyCount} {replyCount === 1 ? 'reply' : 'replies'}
-                            </button>
+                            <div className="flex flex-col items-center">
+                                <button
+                                    className="flex items-center gap-1 hover:text-foreground"
+                                    onClick={() => onReply(id)}
+                                >
+                                    <MessageSquareIcon className="h-3 w-3" />
+                                    <span>{replyCount}</span>
+                                </button>
+                                <span className="text-[10px] text-muted-foreground mt-0.5">
+                                    {replyCount === 1 ? 'reply' : 'replies'}
+                                </span>
+                            </div>
                         )}
                     </div>
                 )}
@@ -161,14 +172,21 @@ export const Message = ({
                         </PopoverContent>
                     </Popover>
 
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8"
-                        onClick={() => onReply(id)}
-                    >
-                        <MessageSquareIcon className="h-4 w-4" />
-                    </Button>
+                    <div className="relative">
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => onReply(id)}
+                        >
+                            <MessageSquareIcon className="h-4 w-4" />
+                        </Button>
+                        {replyCount > 0 && (
+                            <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[10px] text-primary-foreground">
+                                {replyCount > 99 ? '99+' : replyCount}
+                            </span>
+                        )}
+                    </div>
                 </div>
             )}
         </div>

@@ -46,4 +46,16 @@ export interface DBUser {
     status: string;
     full_name: string;
     avatar_url: string;
+}
+
+export interface SearchResult {
+    type: 'message' | 'channel' | 'user'
+    id: string
+    content?: string
+    channelId?: string
+    parentId?: string
+    userId?: string
+    title: string
+    subtitle: string
+    timestamp?: string
 } 

@@ -10,9 +10,10 @@ interface MessageListProps {
     parentId?: string | null
     receiverId?: string | null
     onReply: (messageId: string) => void
+    highlightId?: string
 }
 
-export const MessageList = ({ channelId, parentId = null, receiverId = null, onReply }: MessageListProps) => {
+export const MessageList = ({ channelId, parentId = null, receiverId = null, onReply, highlightId }: MessageListProps) => {
     const { getMessages, getThreadMessages, getDirectMessages, supabase } = useSupabase()
     const messagesEndRef = useRef<HTMLDivElement>(null)
     const [messages, setMessages] = useState<Message[]>([])
@@ -78,6 +79,17 @@ export const MessageList = ({ channelId, parentId = null, receiverId = null, onR
             supabase.removeChannel(channel)
         }
     }, [channelId, parentId, supabase])
+
+    useEffect(() => {
+        if (highlightId) {
+            const element = document.getElementById(`message-${highlightId}`)
+            if (element) {
+                element.scrollIntoView({ behavior: 'smooth' })
+                element.classList.add('bg-accent')
+                setTimeout(() => element.classList.remove('bg-accent'), 2000)
+            }
+        }
+    }, [highlightId])
 
     if (isLoading) {
         return <div>Loading...</div>
