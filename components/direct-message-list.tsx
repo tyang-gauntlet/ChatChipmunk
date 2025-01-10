@@ -1,14 +1,26 @@
 "use client"
 
 import { DBUser } from "@/lib/types"
-import { useEffect, useState } from "react"
+import { useEffect, useState, useMemo } from "react"
 import { useSupabase } from "@/lib/hooks/use-supabase-actions"
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar"
 import { cn } from "@/lib/utils"
+import { formatDistanceToNow } from "date-fns"
 
 interface DirectMessageListProps {
     onUserSelect: (user: DBUser) => void
     selectedUser?: DBUser | null
+}
+
+const UserStatus = ({ status }: { status: string }) => {
+    return (
+        <div
+            className={cn(
+                "w-2 h-2 rounded-full absolute bottom-0 right-0",
+                status === 'online' ? 'bg-green-500' : 'bg-gray-500'
+            )}
+        />
+    )
 }
 
 export const DirectMessageList = ({ onUserSelect, selectedUser }: DirectMessageListProps) => {
@@ -16,59 +28,49 @@ export const DirectMessageList = ({ onUserSelect, selectedUser }: DirectMessageL
     const [isLoading, setIsLoading] = useState(true)
     const { getUsers, supabase } = useSupabase()
 
-    useEffect(() => {
-        const fetchUsers = async () => {
-            try {
-                setIsLoading(true)
-                const users = await getUsers()
-                setUsers(users)
-            } catch (error) {
-                console.error('Failed to fetch users:', error)
-            } finally {
-                setIsLoading(false)
-            }
-        }
+    // Fetch users with online status
+    const fetchUsers = async () => {
+        try {
+            const { data: { user: currentUser } } = await supabase.auth.getUser()
+            if (!currentUser) return
 
+            const { data, error } = await supabase
+                .from('online_users')
+                .select('*')
+                .neq('id', currentUser.id) // Don't include current user
+                .order('is_online', { ascending: false })
+                .order('email', { ascending: true })
+
+            if (error) throw error
+            setUsers(data)
+            setIsLoading(false)
+        } catch (error) {
+            console.error('Failed to fetch users:', error)
+        }
+    }
+
+    // Initial fetch
+    useEffect(() => {
         fetchUsers()
-    }, [getUsers])
 
-    // Subscribe to user presence changes
-    useEffect(() => {
-        const channel = supabase
-            .channel('public:users')
-            .on('postgres_changes', {
-                event: '*',
-                schema: 'public',
-                table: 'users'
-            }, (payload) => {
-                if (payload.eventType === 'INSERT') {
-                    setUsers(prev => [...prev, payload.new as DBUser])
-                } else if (payload.eventType === 'UPDATE') {
-                    setUsers(prev => prev.map(user =>
-                        user.id === payload.new.id ? { ...user, ...payload.new } : user
-                    ))
-                } else if (payload.eventType === 'DELETE') {
-                    setUsers(prev => prev.filter(user => user.id !== payload.old.id))
-                }
-            })
-            .subscribe()
+        // Poll for updates every 10 seconds
+        const interval = setInterval(fetchUsers, 10000)
 
-        return () => {
-            supabase.removeChannel(channel)
-        }
-    }, [supabase])
+        return () => clearInterval(interval)
+    }, [])
 
-    if (isLoading) {
-        return <div className="px-4 py-2 text-sm text-muted-foreground">Loading users...</div>
-    }
-
-    if (!users.length) {
-        return <div className="px-4 py-2 text-sm text-muted-foreground">No users found</div>
-    }
+    // Sort users (online first, then by email)
+    const sortedUsers = useMemo(() => {
+        return [...users].sort((a, b) => {
+            if (a.is_online && !b.is_online) return -1
+            if (!a.is_online && b.is_online) return 1
+            return a.email.localeCompare(b.email)
+        })
+    }, [users])
 
     return (
         <div className="space-y-[2px]">
-            {users.map((user) => (
+            {sortedUsers.map((user) => (
                 <button
                     key={user.id}
                     onClick={() => onUserSelect(user)}
@@ -77,19 +79,22 @@ export const DirectMessageList = ({ onUserSelect, selectedUser }: DirectMessageL
                         selectedUser?.id === user.id && "bg-accent"
                     )}
                 >
-                    <Avatar className="h-6 w-6">
-                        <AvatarImage src={user.avatar_url} />
-                        <AvatarFallback>
-                            {user.email?.[0].toUpperCase() || ''}
-                        </AvatarFallback>
-                    </Avatar>
-                    <div className="flex flex-col items-start text-sm">
-                        <span className="truncate">{user.email}</span>
-                        {user.status && (
-                            <span className="text-xs text-muted-foreground">
-                                {user.status}
-                            </span>
-                        )}
+                    <div className="relative">
+                        <Avatar className="h-6 w-6">
+                            <AvatarImage src={user.avatar_url} />
+                            <AvatarFallback className="text-xs">
+                                {user.email?.[0].toUpperCase() || ''}
+                            </AvatarFallback>
+                        </Avatar>
+                        <UserStatus status={user.is_online ? 'online' : 'offline'} />
+                    </div>
+                    <div className="flex flex-col items-start">
+                        <span className="text-xs font-medium truncate">
+                            {user.email}
+                        </span>
+                        <span className="text-[10px] text-muted-foreground">
+                            {user.is_online ? 'Online' : 'Offline'}
+                        </span>
                     </div>
                 </button>
             ))}

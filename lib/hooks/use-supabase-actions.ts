@@ -272,19 +272,25 @@ export const useSupabase = () => {
     }, [supabase]);
 
     // Users
-    const updateUserStatus = useCallback(async (status: string) => {
-        const { data: user } = await supabase.auth.getUser();
-        if (!user.user) throw new Error('Not authenticated');
+    const updateUserStatus = useCallback(async (status: 'online' | 'offline') => {
+        try {
+            const { data: { user }, error: authError } = await supabase.auth.getUser()
+            if (authError || !user) throw new Error('Not authenticated')
 
-        const { error } = await supabase
-            .from('users')
-            .update({
-                status,
-                last_seen: new Date().toISOString(),
-            })
-            .eq('id', user.user.id);
-        if (error) throw error;
-    }, [supabase]);
+            const { error } = await supabase
+                .from('users')
+                .update({
+                    status,
+                    last_ping: status === 'online' ? new Date().toISOString() : null
+                })
+                .eq('id', user.id)
+
+            if (error) throw error
+        } catch (error) {
+            console.error('Error updating status:', error)
+            throw error
+        }
+    }, [supabase])
 
     const searchUsers = useCallback(async (query: string) => {
         const { data, error } = await supabase

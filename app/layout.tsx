@@ -1,5 +1,6 @@
 import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
+import { UserPresence } from '@/components/user-presence'
 
 export const metadata = {
   title: 'ChatChipmunk',
@@ -17,6 +18,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body>
+        <UserPresence />
         <ThemeProvider
           attribute="class"
           defaultTheme="system"
