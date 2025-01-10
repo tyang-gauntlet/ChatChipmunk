@@ -74,14 +74,15 @@ export function ChannelList({ onChannelSelect }: ChannelListProps) {
     }, [supabase])
 
     const handleDelete = async () => {
-        if (!channelToDelete) return
+        if (!channelToDelete) return;
         try {
-            await deleteChannel(channelToDelete.id)
-            setChannelToDelete(null)
+            await deleteChannel(channelToDelete.id);
+            setChannelToDelete(null);
         } catch (error) {
-            console.error('Failed to delete channel:', error)
+            console.error('Failed to delete channel:', error);
+            alert('Failed to delete channel. Check console for details.');
         }
-    }
+    };
 
     if (isLoading) {
         return <div className="p-4">Loading channels...</div>

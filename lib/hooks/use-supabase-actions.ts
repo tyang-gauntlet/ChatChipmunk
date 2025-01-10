@@ -66,11 +66,36 @@ export const useSupabase = () => {
     }, [supabase]);
 
     const deleteChannel = useCallback(async (channelId: string) => {
-        const { error } = await supabase
-            .from('channels')
-            .delete()
-            .eq('id', channelId);
-        if (error) throw error;
+        try {
+            // First delete channel members
+            const { error: memberError } = await supabase
+                .from('channel_members')
+                .delete()
+                .eq('channel_id', channelId);
+
+            if (memberError) throw memberError;
+
+            // Then delete messages
+            const { error: messageError } = await supabase
+                .from('messages')
+                .delete()
+                .eq('channel_id', channelId);
+
+            if (messageError) throw messageError;
+
+            // Finally delete the channel
+            const { error: channelError } = await supabase
+                .from('channels')
+                .delete()
+                .eq('id', channelId);
+
+            if (channelError) throw channelError;
+
+            return true;
+        } catch (error) {
+            console.error('Error deleting channel:', error);
+            throw error;
+        }
     }, [supabase]);
 
     // Messages
