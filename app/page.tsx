@@ -182,7 +182,7 @@ export default function Home() {
                       onReply={() => { }}
                     />
                     <MessageInput
-                      channelId={null}
+                      channelId={currentChannel.id}
                       parentId={selectedThread}
                     />
                   </div>

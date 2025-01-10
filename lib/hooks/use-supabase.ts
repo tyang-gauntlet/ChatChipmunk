@@ -52,26 +52,42 @@ export const useSupabase = () => {
                     user:users!messages_user_id_fkey (
                         id,
                         email,
+                        full_name,
                         avatar_url
                     ),
                     reactions!reactions_message_id_fkey (
                         id,
                         emoji,
-                        user:users!reactions_user_id_fkey (
+                        users:users!reactions_user_id_fkey (
                             id,
-                            email
+                            full_name
                         )
                     )
                 `)
                 .eq('channel_id', channelId)
                 .order('created_at', { ascending: true })
 
-            if (error) {
-                console.error('Error fetching messages:', error)
-                throw error
-            }
+            if (error) throw error
 
-            return data as Message[]
+            return data.map(msg => ({
+                id: msg.id,
+                content: msg.content,
+                attachments: msg.attachments,
+                created_at: msg.created_at,
+                user: {
+                    id: msg.user[0]?.id,
+                    full_name: msg.user[0]?.full_name,
+                    avatar_url: msg.user[0]?.avatar_url
+                },
+                reactions: msg.reactions.map(r => ({
+                    id: r.id,
+                    emoji: r.emoji,
+                    users: r.users.map(u => ({
+                        id: u.id,
+                        full_name: u.full_name
+                    }))
+                }))
+            })) as Message[]
         } catch (error) {
             console.error('Error fetching messages:', error)
             throw error
@@ -83,7 +99,10 @@ export const useSupabase = () => {
             const { data, error } = await supabase
                 .from('messages')
                 .select(`
-                    *,
+                    id,
+                    content,
+                    attachments,
+                    created_at,
                     user:users(id, full_name, avatar_url),
                     reactions(
                         id, emoji,
@@ -94,12 +113,31 @@ export const useSupabase = () => {
                 .order('created_at', { ascending: true })
 
             if (error) throw error
-            return data as Message[]
+
+            return data.map(msg => ({
+                id: msg.id,
+                content: msg.content,
+                attachments: msg.attachments || [],
+                created_at: msg.created_at,
+                user: {
+                    id: msg.user[0]?.id,
+                    full_name: msg.user[0]?.full_name,
+                    avatar_url: msg.user[0]?.avatar_url
+                },
+                reactions: msg.reactions.map(r => ({
+                    id: r.id,
+                    emoji: r.emoji,
+                    users: r.users.map(u => ({
+                        id: u.id,
+                        full_name: u.full_name
+                    }))
+                }))
+            })) as Message[]
         } catch (error) {
             console.error('Error fetching thread messages:', error)
             throw error
         }
-    }, [])
+    }, [supabase])
 
     const sendMessage = useCallback(async (
         content: string,

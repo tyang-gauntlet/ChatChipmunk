@@ -28,7 +28,7 @@ export const MessageInput = ({ channelId, parentId }: MessageInputProps) => {
         if (!content.trim() && selectedFiles.length === 0) return
 
         try {
-            let attachments = []
+            let attachments: { file_name: string; file_size: number; file_type: string; url: string }[] = []
 
             // Handle file uploads if any
             if (selectedFiles.length > 0) {
@@ -43,7 +43,7 @@ export const MessageInput = ({ channelId, parentId }: MessageInputProps) => {
                     content: content.trim(),
                     channel_id: channelId,
                     parent_id: parentId || null,
-                    attachments
+                    attachments: attachments
                 })
 
             if (error) throw error

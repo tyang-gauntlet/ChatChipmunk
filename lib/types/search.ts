@@ -18,7 +18,6 @@ export interface Message {
     channels: {
         name: string
     }
-    attachments?: Attachment[]
 }
 
 export interface Channel {

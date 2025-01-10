@@ -111,6 +111,7 @@ export const MessageList = ({ channelId, parentId = null, receiverId = null, onR
                         avatarUrl: message.user?.avatar_url || undefined
                     }}
                     reactions={message.reactions?.map(r => ({
+                        id: r.id,
                         emoji: r.emoji,
                         users: r.users.map(u => ({
                             id: u.id,

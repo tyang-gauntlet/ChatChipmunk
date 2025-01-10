@@ -1,7 +1,6 @@
 import { useCallback } from 'react'
 import { getSupabaseClient } from '../supabase/client'
-import { Database } from '@/lib/database.types';
-import { DBUser } from '../types';
+import { DBUser, Reaction } from '@/lib/types';
 
 export const useSupabase = () => {
     const supabase = getSupabaseClient();
@@ -206,37 +205,32 @@ export const useSupabase = () => {
     }, [supabase]);
 
     // Reactions
-    const addReaction = useCallback(async (messageId: string, emoji: string) => {
-        try {
-            const { data: { user }, error: authError } = await supabase.auth.getUser()
-            if (authError || !user) throw new Error('Not authenticated')
+    const addReaction = async (messageId: string, emoji: string): Promise<Reaction> => {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) throw new Error('No user')
 
-            const { data, error } = await supabase
-                .from('reactions')
-                .insert({
-                    message_id: messageId,
-                    user_id: user.id,
-                    emoji
-                })
-                .select('id, emoji')
-                .single()
+        const { data, error } = await supabase
+            .from('reactions')
+            .insert({
+                message_id: messageId,
+                emoji,
+                user_id: user.id
+            })
+            .select('id, emoji')
+            .single()
 
-            if (error) throw error
+        if (error) throw error
 
-            // Return formatted reaction
-            return {
-                id: data.id,
-                emoji: data.emoji,
-                users: [{
-                    id: user.id,
-                    fullName: user.email // We'll use email as fallback
-                }]
-            }
-        } catch (error) {
-            console.error('Error adding reaction:', error)
-            throw error
+        // Ensure we return a properly typed reaction
+        return {
+            id: data.id,
+            emoji: data.emoji,
+            users: [{
+                id: user.id,
+                fullName: user.user_metadata.full_name || user.email // Fallback to email if name not available
+            }]
         }
-    }, [supabase])
+    }
 
     const removeReaction = useCallback(async (reactionId: string) => {
         const { error } = await supabase
@@ -374,14 +368,14 @@ export const useSupabase = () => {
             // Format message results
             if (!messagesRes.error && messagesRes.data) {
                 results.push(...messagesRes.data.map(msg => ({
-                    type: 'message',
+                    type: 'message' as const,
                     id: msg.id,
                     content: msg.content,
                     channelId: msg.channel_id,
                     parentId: msg.parent_id,
-                    userId: msg.user?.id,
+                    userId: msg.user?.[0]?.id || '',
                     title: msg.content.substring(0, 50) + (msg.content.length > 50 ? '...' : ''),
-                    subtitle: `by ${msg.user?.email}`,
+                    subtitle: `by ${msg.user?.[0]?.email || 'Unknown'}`,
                     timestamp: msg.created_at
                 })))
             }
@@ -389,7 +383,7 @@ export const useSupabase = () => {
             // Format channel results
             if (!channelsRes.error && channelsRes.data) {
                 results.push(...channelsRes.data.map(channel => ({
-                    type: 'channel',
+                    type: 'channel' as const,
                     id: channel.id,
                     title: `#${channel.name}`,
                     subtitle: channel.description || 'No description'
@@ -399,7 +393,7 @@ export const useSupabase = () => {
             // Format user results
             if (!usersRes.error && usersRes.data) {
                 results.push(...usersRes.data.map(user => ({
-                    type: 'user',
+                    type: 'user' as const,
                     id: user.id,
                     title: user.full_name || user.email,
                     subtitle: user.full_name ? user.email : 'Direct Message'

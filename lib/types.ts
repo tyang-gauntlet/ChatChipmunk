@@ -1,7 +1,12 @@
 export interface Message {
     id: string;
     content: string;
-    attachments: any[];
+    attachments: {
+        file_name: string;
+        file_size: number;
+        file_type: string;
+        url: string;
+    }[];
     created_at: string;
     user: {
         id: string;
@@ -46,6 +51,7 @@ export interface DBUser {
     status: string;
     full_name: string;
     avatar_url: string;
+    is_online: boolean;
 }
 
 export interface SearchResult {
@@ -58,4 +64,13 @@ export interface SearchResult {
     title: string
     subtitle: string
     timestamp?: string
+}
+
+export interface Reaction {
+    id: string;
+    emoji: string;
+    users: {
+        id: string;
+        fullName: string;
+    }[];
 } 

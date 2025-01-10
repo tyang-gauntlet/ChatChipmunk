@@ -34,21 +34,21 @@ const CommandSearch = () => {
 
             const searchResults: SearchResult[] = [
                 ...(messages?.map((message: Message) => ({
-                    type: 'message',
+                    type: 'message' as const,
                     id: message.id,
                     title: message.content,
                     subtitle: `in #${message.channels.name} by ${message.users.full_name}`,
                     url: `/channels/${message.channel_id}?message=${message.id}`
                 })) || []),
                 ...(channels?.map((channel: Channel) => ({
-                    type: 'channel',
+                    type: 'channel' as const,
                     id: channel.id,
                     title: `#${channel.name}`,
                     subtitle: channel.description || 'No description',
                     url: `/channels/${channel.id}`
                 })) || []),
                 ...(users?.map((user: User) => ({
-                    type: 'user',
+                    type: 'user' as const,
                     id: user.id,
                     title: user.full_name,
                     subtitle: user.email,

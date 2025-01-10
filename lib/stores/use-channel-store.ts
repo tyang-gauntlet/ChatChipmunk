@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { supabase } from '@/lib/supabase';
+import { getSupabaseClient } from '@/lib/supabase/client';
 import { Channel } from '@/lib/types';
 
 interface ChannelStore {
@@ -19,6 +19,7 @@ export const useChannelStore = create<ChannelStore>((set, get) => ({
 
     createChannel: async (name: string, description: string, isPrivate: boolean) => {
         try {
+            const supabase = getSupabaseClient();
             const { data: user } = await supabase.auth.getUser();
             if (!user.user) return;
 
@@ -46,6 +47,7 @@ export const useChannelStore = create<ChannelStore>((set, get) => ({
 
     deleteChannel: async (id: string) => {
         try {
+            const supabase = getSupabaseClient();
             const { error } = await supabase
                 .from('channels')
                 .delete()
@@ -65,6 +67,7 @@ export const useChannelStore = create<ChannelStore>((set, get) => ({
 
     fetchChannels: async () => {
         try {
+            const supabase = getSupabaseClient();
             set({ isLoading: true });
             const { data, error } = await supabase
                 .from('channels')
