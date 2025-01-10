@@ -1,9 +1,10 @@
-import { createBrowserClient } from '@supabase/ssr';
+import { createClient } from '@supabase/supabase-js'
 import { Database } from '@/lib/database.types';
 import { useCallback } from 'react';
+import { DBUser } from '../types';
 
 export const useSupabase = () => {
-    const supabase = createBrowserClient<Database>(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
+    const supabase = createClient<Database>(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
 
     // Channels
     const getChannels = useCallback(async () => {
@@ -117,17 +118,20 @@ export const useSupabase = () => {
     }, [supabase]);
 
     const getThreadMessages = useCallback(async (parentId: string) => {
-        const { data, error } = await supabase
-            .from('messages')
-            .select(`
-                *,
-                users (id, full_name, avatar_url),
-                reactions (*, users (id, full_name))
-            `)
-            .eq('parent_id', parentId)
-            .order('created_at', { ascending: true });
-        if (error) throw error;
-        return data;
+        try {
+            const { data, error } = await supabase
+                .from('messages')
+                .select(`*`)
+                .eq('parent_id', parentId)
+                .order('created_at', { ascending: true });
+
+            if (error) throw error;
+
+            return data;
+        } catch (error) {
+            console.error('Error fetching messages:', error);
+            throw error;
+        }
     }, [supabase]);
 
     const sendMessage = useCallback(async (
@@ -277,7 +281,23 @@ export const useSupabase = () => {
         return data;
     }, [supabase]);
 
+    const getUsers = useCallback(async (): Promise<DBUser[]> => {
+        const { data: users, error } = await supabase
+            .from('users')
+            .select('*')
+            .order('email')
+
+        if (error) {
+            console.error('Error fetching users:', error)
+            throw error
+        }
+
+        return users as DBUser[]
+    }, [supabase])
+
+
     return {
+        supabase,
         // Channels
         getChannels,
         createChannel,
@@ -298,5 +318,6 @@ export const useSupabase = () => {
         // Users
         updateUserStatus,
         searchUsers,
+        getUsers,
     };
 }; 

@@ -5,34 +5,29 @@ import { Button } from './ui/button'
 import { SendIcon } from 'lucide-react'
 import { Input } from './ui/input'
 import { useSupabase } from '@/lib/hooks/use-supabase-actions'
+
 interface MessageInputProps {
-    channelId?: string
-    receiverId?: string
-    parentId?: string
+    channelId?: string | null
+    parentId?: string | null
 }
 
-export const MessageInput = ({ channelId, receiverId, parentId }: MessageInputProps) => {
+export const MessageInput = ({ channelId = null, parentId = null }: MessageInputProps) => {
     const [message, setMessage] = useState('')
-    const { sendMessage, sendDirectMessage } = useSupabase()
+    const { sendMessage } = useSupabase()
 
-    const handleSend = async () => {
-        if (!message.trim()) return
+    const handleSubmit = async (content: string) => {
         try {
-            if (channelId) {
-                await sendMessage(message, channelId, parentId)
-            } else if (receiverId) {
-                await sendDirectMessage(receiverId, message)
-            }
+            await sendMessage(content, channelId || undefined, parentId || undefined)
             setMessage('')
         } catch (error) {
-            console.error('Failed to send message:', error)
+            console.error('Error sending message:', error)
         }
     }
 
     const handleKeyDown = (e: React.KeyboardEvent) => {
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault()
-            handleSend()
+            handleSubmit(message)
         }
     }
 
@@ -45,7 +40,7 @@ export const MessageInput = ({ channelId, receiverId, parentId }: MessageInputPr
                 placeholder="Type a message..."
                 className="flex-1"
             />
-            <Button onClick={handleSend}>
+            <Button onClick={() => handleSubmit(message)}>
                 <SendIcon className="h-4 w-4" />
             </Button>
         </div>

@@ -3,7 +3,7 @@
 import { ModeToggle } from "@/components/mode-toggle"
 import { UserNav } from "@/components/user-nav"
 import { ChannelList } from "@/components/channel-list"
-// import { DirectMessageList } from "@/components/direct-message-list"
+import { DirectMessageList } from "@/components/direct-message-list"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { ChevronRight } from "lucide-react"
@@ -23,16 +23,48 @@ import { MessageList } from '@/components/message-list'
 import { Plus } from "lucide-react"
 import { CreateChannelDialog } from "@/components/create-channel-dialog"
 import { Channel } from "@/lib/types"
+import { DBUser } from "@/lib/types"
+import { useSupabase } from "@/lib/hooks/use-supabase-actions"
+import { ThreadHeader } from "@/components/thread-header"
+import { Message } from "@/lib/types"
 
 export default function Home() {
   const [open, setOpen] = useState(false)
   const [selectedThread, setSelectedThread] = useState<string | null>(null)
   const [currentChannel, setCurrentChannel] = useState<Channel | null>(null)
+  const [selectedUser, setSelectedUser] = useState<DBUser | null>(null)
+  const [parentMessage, setParentMessage] = useState<Message | null>(null)
+  const { getMessages } = useSupabase()
 
   const handleChannelSelect = (channel: Channel) => {
     setCurrentChannel(channel)
     setSelectedThread(null) // Reset thread when changing channels
   }
+
+  const handleUserSelect = (user: DBUser) => {
+    setSelectedUser(user)
+    setCurrentChannel(null) // Reset channel when switching to DM
+    setSelectedThread(null)
+  }
+
+  useEffect(() => {
+    const fetchParentMessage = async () => {
+      if (!selectedThread) {
+        setParentMessage(null)
+        return
+      }
+
+      try {
+        const messages = await getMessages(currentChannel!.id)
+        const parent = messages.find(m => m.id === selectedThread)
+        setParentMessage(parent || null)
+      } catch (error) {
+        console.error('Error fetching parent message:', error)
+      }
+    }
+
+    fetchParentMessage()
+  }, [selectedThread, currentChannel, getMessages])
 
   return (
     <div className="flex flex-col h-screen w-full">
@@ -106,7 +138,7 @@ export default function Home() {
                     <h2 className="text-sm font-semibold ml-1.5">Direct Messages</h2>
                   </CollapsibleTrigger>
                   <CollapsibleContent className="mt-1">
-                    {/* <DirectMessageList /> */}
+                    <DirectMessageList onUserSelect={handleUserSelect} />
                   </CollapsibleContent>
                 </Collapsible>
               </div>
@@ -119,7 +151,11 @@ export default function Home() {
           {/* Channel header */}
           <div className="border-b p-4">
             <h2 className="font-semibold">
-              {currentChannel ? `# ${currentChannel.name}` : 'Select a channel'}
+              {currentChannel
+                ? `# ${currentChannel.name}`
+                : selectedUser
+                  ? `${selectedUser.email}`
+                  : 'Select a channel or user'}
             </h2>
           </div>
 
@@ -135,17 +171,21 @@ export default function Home() {
 
               {selectedThread && (
                 <div className="w-96 border-l flex flex-col">
-                  <div className="p-4 border-b">
-                    <h3 className="font-semibold">Thread</h3>
-                  </div>
-                  {/* <MessageList
-                    parentId={selectedThread}
-                    onReply={() => { }}
+                  <ThreadHeader
+                    onClose={() => setSelectedThread(null)}
+                    parentMessage={parentMessage}
                   />
-                  <MessageInput
-                    channelId="current-channel-id"
-                    parentId={selectedThread}
-                  /> */}
+                  <div className="flex-1 flex flex-col min-h-0">
+                    <MessageList
+                      channelId={null}
+                      parentId={selectedThread}
+                      onReply={() => { }}
+                    />
+                    <MessageInput
+                      channelId={null}
+                      parentId={selectedThread}
+                    />
+                  </div>
                 </div>
               )}
             </div>

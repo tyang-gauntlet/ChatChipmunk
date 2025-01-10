@@ -9,11 +9,11 @@ export const useAuth = () => {
     const router = useRouter()
     const supabase = createClient()
 
-    const login = async (e: React.FormEvent<HTMLFormElement>) => {
-        e.preventDefault()
+    const login = async (event: React.FormEvent<HTMLFormElement>) => {
+        event.preventDefault()
         try {
             setIsLoading(true)
-            const formData = new FormData(e.currentTarget)
+            const formData = new FormData(event.currentTarget)
             const data = {
                 email: formData.get('email') as string,
                 password: formData.get('password') as string,
@@ -34,11 +34,11 @@ export const useAuth = () => {
         }
     }
 
-    const signup = async (e: React.FormEvent<HTMLFormElement>) => {
-        e.preventDefault()
+    const signup = async (event: React.FormEvent<HTMLFormElement>) => {
+        event.preventDefault()
         try {
             setIsLoading(true)
-            const formData = new FormData(e.currentTarget)
+            const formData = new FormData(event.currentTarget)
             const data = {
                 email: formData.get('email') as string,
                 password: formData.get('password') as string,

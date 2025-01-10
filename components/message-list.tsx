@@ -7,13 +7,13 @@ import { useSupabase } from '@/lib/hooks/use-supabase-actions'
 import { createClient } from '@/lib/hooks/use-supabase-client'
 
 interface MessageListProps {
-    channelId?: string
-    receiverId?: string
-    parentId?: string
+    channelId?: string | null
+    parentId?: string | null
+    receiverId?: string | null
     onReply: (messageId: string) => void
 }
 
-export const MessageList = ({ channelId, receiverId, parentId, onReply }: MessageListProps) => {
+export const MessageList = ({ channelId, parentId = null, receiverId = null, onReply }: MessageListProps) => {
     const { getMessages, getThreadMessages, getDirectMessages, addReaction, removeReaction } = useSupabase()
     const supabase = createClient()
     const messagesEndRef = useRef<HTMLDivElement>(null)

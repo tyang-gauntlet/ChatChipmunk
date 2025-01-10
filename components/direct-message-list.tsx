@@ -1,92 +1,61 @@
 "use client"
 
+import { DBUser } from "@/lib/types"
 import { useEffect, useState } from "react"
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
-import { Button } from "@/components/ui/button"
-import { ScrollArea } from "@/components/ui/scroll-area"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { cn } from "@/lib/utils"
-import { useRouter, usePathname } from "next/navigation"
+import { useSupabase } from "@/lib/hooks/use-supabase-actions"
+import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar"
 
-type User = {
-    id: string
-    full_name: string
-    avatar_url?: string
-    status?: string
+interface DirectMessageListProps {
+    onUserSelect: (user: DBUser) => void
 }
 
-export function DirectMessageList() {
-    const [users, setUsers] = useState<User[]>([])
-    const router = useRouter()
-    const pathname = usePathname()
-    const supabase = createClientComponentClient()
+export const DirectMessageList = ({ onUserSelect }: DirectMessageListProps) => {
+    const [users, setUsers] = useState<DBUser[]>([])
+    const [isLoading, setIsLoading] = useState(true)
+    const { getUsers } = useSupabase()
 
     useEffect(() => {
         const fetchUsers = async () => {
-            const { data: { user } } = await supabase.auth.getUser()
-            if (!user) return
-
-            const { data: users, error } = await supabase
-                .from('users')
-                .select('*')
-                .neq('id', user.id)
-                .order('full_name')
-
-            if (!error && users) {
+            try {
+                const users = await getUsers()
                 setUsers(users)
+            } catch (error) {
+                console.error('Failed to fetch users:', error)
+            } finally {
+                setIsLoading(false)
             }
         }
 
         fetchUsers()
+    }, [])
 
-        // Subscribe to user status changes
-        const channel = supabase
-            .channel('user-presence')
-            .on('presence', { event: 'sync' }, () => fetchUsers())
-            .subscribe()
+    if (isLoading) {
+        return <div className="px-4 py-2 text-sm text-muted-foreground">Loading...</div>
+    }
 
-        return () => {
-            supabase.removeChannel(channel)
-        }
-    }, [supabase])
-
-    const getInitials = (name: string) => {
-        return name
-            .split(' ')
-            .map(word => word[0])
-            .join('')
-            .toUpperCase()
+    if (!users.length) {
+        return <div className="px-4 py-2 text-sm text-muted-foreground">No users found</div>
     }
 
     return (
-        <ScrollArea className="space-y-1">
+        <div className="space-y-[2px]">
             {users.map((user) => (
-                <Button
+                <button
                     key={user.id}
-                    variant="ghost"
-                    size="sm"
-                    className={cn(
-                        "w-full justify-start font-normal",
-                        pathname === `/dm/${user.id}` && "bg-accent"
-                    )}
-                    onClick={() => router.push(`/dm/${user.id}`)}
+                    onClick={() => onUserSelect(user)}
+                    className="w-full flex items-center gap-2 px-4 py-1.5 hover:bg-accent rounded-md"
                 >
-                    <Avatar className="h-6 w-6 mr-2">
-                        {user.avatar_url ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img src={user.avatar_url} alt={user.full_name} />
-                        ) : (
-                            <AvatarFallback>{getInitials(user.full_name)}</AvatarFallback>
-                        )}
+                    <Avatar className="h-6 w-6">
+                        <AvatarImage src={user.avatar_url} />
+                        <AvatarFallback>
+                            {user.email?.[0].toUpperCase() || ''}
+                        </AvatarFallback>
                     </Avatar>
-                    <span className="truncate">{user.full_name}</span>
-                    {user.status && (
-                        <span className="ml-auto text-xs text-muted-foreground">
-                            {user.status}
-                        </span>
-                    )}
-                </Button>
+                    <span className="text-sm truncate">
+                        {user.email}
+                    </span>
+                </button>
             ))}
-        </ScrollArea>
+        </div>
     )
 } 

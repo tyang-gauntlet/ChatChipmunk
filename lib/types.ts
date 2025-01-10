@@ -36,4 +36,14 @@ export interface User {
     last_seen: string | null;
     status: string | null;
     created_at: string;
+}
+
+export interface DBUser {
+    id: string;
+    email: string;
+    created_at: string;
+    last_seen: string;
+    status: string;
+    full_name: string;
+    avatar_url: string;
 } 
