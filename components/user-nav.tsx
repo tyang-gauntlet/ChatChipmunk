@@ -1,20 +1,30 @@
 "use client"
 
+import { useEffect, useState } from "react"
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 import { useRouter } from "next/navigation"
 import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
-    DropdownMenuLabel,
-    DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 
 export function UserNav() {
+    const [userInitial, setUserInitial] = useState("")
     const router = useRouter()
     const supabase = createClientComponentClient()
+
+    useEffect(() => {
+        const getUser = async () => {
+            const { data: { user } } = await supabase.auth.getUser()
+            if (user?.email) {
+                setUserInitial(user.email[0].toUpperCase())
+            }
+        }
+        getUser()
+    }, [supabase])
 
     const handleSignOut = async () => {
         await supabase.auth.signOut()
@@ -25,13 +35,13 @@ export function UserNav() {
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
                 <Avatar className="h-8 w-8 cursor-pointer">
-                    <AvatarFallback>JD</AvatarFallback>
+                    <AvatarFallback>{userInitial}</AvatarFallback>
                 </Avatar>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-                <DropdownMenuLabel>My Account</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={handleSignOut}>Log out</DropdownMenuItem>
+            <DropdownMenuContent align="end" className="bg-background">
+                <DropdownMenuItem onClick={handleSignOut} className="bg-background hover:bg-accent">
+                    Sign out
+                </DropdownMenuItem>
             </DropdownMenuContent>
         </DropdownMenu>
     )

@@ -45,16 +45,10 @@ export default function LoginPage() {
         const formData = new FormData(e.currentTarget)
         const email = formData.get("email") as string
         const password = formData.get("password") as string
-        const fullName = formData.get("fullName") as string
 
         const { error: signUpError } = await supabase.auth.signUp({
             email,
             password,
-            options: {
-                data: {
-                    full_name: fullName,
-                },
-            },
         })
 
         if (signUpError) {
@@ -108,15 +102,6 @@ export default function LoginPage() {
                         </TabsContent>
                         <TabsContent value="signup">
                             <form onSubmit={handleSignUp} className="space-y-4">
-                                <div className="space-y-2">
-                                    <Label htmlFor="signup-fullname">Full Name</Label>
-                                    <Input
-                                        id="signup-fullname"
-                                        name="fullName"
-                                        type="text"
-                                        required
-                                    />
-                                </div>
                                 <div className="space-y-2">
                                     <Label htmlFor="signup-email">Email</Label>
                                     <Input

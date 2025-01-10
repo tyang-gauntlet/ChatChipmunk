@@ -2,6 +2,14 @@ import { ThemeProvider } from "@/components/theme-provider"
 import { Toaster } from "sonner"
 import "./globals.css"
 
+export const metadata = {
+  title: 'ChatChipmunk',
+  description: 'Real-time chat application',
+  metadataBase: new URL(
+    process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+  ),
+}
+
 export default function RootLayout({
   children,
 }: {
