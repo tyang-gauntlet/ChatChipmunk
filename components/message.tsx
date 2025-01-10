@@ -30,6 +30,7 @@ interface MessageProps {
     reactions: Reaction[]
     replyCount: number
     onReply: (messageId: string) => void
+    isDirect?: boolean
 }
 
 export const Message = ({
@@ -41,6 +42,7 @@ export const Message = ({
     reactions: initialReactions = [],
     replyCount,
     onReply,
+    isDirect,
 }: MessageProps) => {
     const [showActions, setShowActions] = useState(false)
     const [currentReactions, setCurrentReactions] = useState<Reaction[]>(initialReactions)
@@ -121,38 +123,42 @@ export const Message = ({
                     </div>
                 )}
 
-                {(currentReactions?.length > 0 || replyCount > 0) && (
-                    <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground mt-2">
-                        <div className="flex flex-wrap gap-1">
-                            {currentReactions.map((reaction) => (
-                                <div key={reaction.id} className="flex flex-col items-center">
-                                    <button
-                                        className="flex items-center gap-1 bg-accent rounded-full px-2 py-1 hover:bg-accent/80"
-                                        onClick={() => handleReaction(reaction.emoji)}
-                                    >
-                                        <span>{reaction.emoji}</span>
-                                    </button>
-                                    <span className="text-[10px] text-muted-foreground mt-0.5">
-                                        {reaction.users?.length || 0}
-                                    </span>
+                {!isDirect && (
+                    <>
+                        {(currentReactions?.length > 0 || replyCount > 0) && (
+                            <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground mt-2">
+                                <div className="flex flex-wrap gap-1">
+                                    {currentReactions.map((reaction) => (
+                                        <div key={reaction.id} className="flex flex-col items-center">
+                                            <button
+                                                className="flex items-center gap-1 bg-accent rounded-full px-2 py-1 hover:bg-accent/80"
+                                                onClick={() => handleReaction(reaction.emoji)}
+                                            >
+                                                <span>{reaction.emoji}</span>
+                                            </button>
+                                            <span className="text-[10px] text-muted-foreground mt-0.5">
+                                                {reaction.users?.length || 0}
+                                            </span>
+                                        </div>
+                                    ))}
                                 </div>
-                            ))}
-                        </div>
-                        {replyCount > 0 && (
-                            <div className="flex flex-col items-center">
-                                <button
-                                    className="flex items-center gap-1 hover:text-foreground"
-                                    onClick={() => onReply(id)}
-                                >
-                                    <MessageSquareIcon className="h-3 w-3" />
-                                    <span>{replyCount}</span>
-                                </button>
-                                <span className="text-[10px] text-muted-foreground mt-0.5">
-                                    {replyCount === 1 ? 'reply' : 'replies'}
-                                </span>
+                                {replyCount > 0 && (
+                                    <div className="flex flex-col items-center">
+                                        <button
+                                            className="flex items-center gap-1 hover:text-foreground"
+                                            onClick={() => onReply(id)}
+                                        >
+                                            <MessageSquareIcon className="h-3 w-3" />
+                                            <span>{replyCount}</span>
+                                        </button>
+                                        <span className="text-[10px] text-muted-foreground mt-0.5">
+                                            {replyCount === 1 ? 'reply' : 'replies'}
+                                        </span>
+                                    </div>
+                                )}
                             </div>
                         )}
-                    </div>
+                    </>
                 )}
             </div>
 

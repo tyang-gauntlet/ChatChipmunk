@@ -22,11 +22,13 @@ import { MessageInput } from '@/components/message-input'
 import { MessageList } from '@/components/message-list'
 import { Plus } from "lucide-react"
 import { CreateChannelDialog } from "@/components/create-channel-dialog"
-import { Channel } from "@/lib/types"
-import { DBUser } from "@/lib/types"
+import { Channel, User } from "@/lib/types"
 import { useSupabase } from "@/lib/hooks/use-supabase-actions"
 import { ThreadHeader } from "@/components/thread-header"
 import { Message } from "@/lib/types"
+import { User as SupabaseUser } from '@supabase/supabase-js'
+
+type DBUser = SupabaseUser
 
 export default function Home() {
   const [open, setOpen] = useState(false)
@@ -138,7 +140,7 @@ export default function Home() {
                     <h2 className="text-sm font-semibold ml-1.5">Direct Messages</h2>
                   </CollapsibleTrigger>
                   <CollapsibleContent className="mt-1">
-                    <DirectMessageList onUserSelect={handleUserSelect} />
+                    <DirectMessageList onUserSelect={(user: DBUser) => handleUserSelect(user)} />
                   </CollapsibleContent>
                 </Collapsible>
               </div>

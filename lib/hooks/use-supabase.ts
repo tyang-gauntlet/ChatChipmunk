@@ -272,6 +272,134 @@ export const useSupabase = () => {
         }
     }, [getCurrentUser])
 
+    const getDirectMessages = useCallback(async (userId: string) => {
+        try {
+            const { data: { user } } = await supabase.auth.getUser()
+            if (!user) throw new Error('Not authenticated')
+
+            const { data, error } = await supabase
+                .from('direct_messages')
+                .select(`
+                    id,
+                    content,
+                    sender_id,
+                    receiver_id,
+                    attachments,
+                    created_at,
+                    sender:users!direct_messages_sender_id_fkey!inner(
+                        id,
+                        full_name,
+                        avatar_url
+                    ),
+                    receiver:users!direct_messages_receiver_id_fkey!inner(
+                        id,
+                        full_name,
+                        avatar_url
+                    )
+                `)
+                .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
+                .order('created_at', { ascending: true })
+
+            if (error) throw error
+
+            return (data.map(msg => ({
+                id: msg.id,
+                content: msg.content,
+                sender_id: msg.sender_id,
+                receiver_id: msg.receiver_id,
+                attachments: msg.attachments || [],
+                created_at: msg.created_at,
+                sender: (msg.sender as unknown as { id: string; full_name: string; avatar_url: string }[])[0],
+                receiver: (msg.receiver as unknown as { id: string; full_name: string; avatar_url: string }[])[0]
+            })) as unknown) as {
+                id: string
+                content: string
+                sender_id: string
+                receiver_id: string
+                attachments: any[]
+                created_at: string
+                sender: {
+                    id: string
+                    full_name: string
+                    avatar_url: string
+                }
+                receiver: {
+                    id: string
+                    full_name: string
+                    avatar_url: string
+                }
+            }[]
+        } catch (error) {
+            console.error('Error fetching direct messages:', error)
+            throw error
+        }
+    }, [supabase])
+
+    const sendDirectMessage = useCallback(async (
+        receiverId: string,
+        content: string,
+        attachments?: any[]
+    ) => {
+        try {
+            const { data: { user } } = await supabase.auth.getUser()
+            if (!user) throw new Error('Not authenticated')
+
+            const { data, error } = await supabase
+                .from('direct_messages')
+                .insert({
+                    content,
+                    sender_id: user.id,
+                    receiver_id: receiverId,
+                    attachments
+                })
+                .select(`
+                    id,
+                    content,
+                    sender_id,
+                    receiver_id,
+                    attachments,
+                    created_at,
+                    sender:users!direct_messages_sender_id_fkey!inner(
+                        id,
+                        full_name,
+                        avatar_url
+                    ),
+                    receiver:users!direct_messages_receiver_id_fkey!inner(
+                        id,
+                        full_name,
+                        avatar_url
+                    )
+                `)
+                .single()
+            if (error) throw error
+            return ({
+                ...data,
+                sender: (data.sender as unknown as { id: string; full_name: string; avatar_url: string }[])[0],
+                receiver: (data.receiver as unknown as { id: string; full_name: string; avatar_url: string }[])[0]
+            }) as {
+                id: string
+                content: string
+                sender_id: string
+                receiver_id: string
+                attachments: any[]
+                created_at: string
+                sender: {
+                    id: string
+                    full_name: string
+                    avatar_url: string
+                }
+                receiver: {
+                    id: string
+                    full_name: string
+                    avatar_url: string
+                }
+            }
+        } catch (error) {
+            console.error('Error sending direct message:', error)
+            throw error
+        }
+    }, [supabase])
+
     return {
         getChannels,
         getMessages,
@@ -281,5 +409,7 @@ export const useSupabase = () => {
         addReaction,
         removeReaction,
         createChannel,
+        getDirectMessages,
+        sendDirectMessage,
     }
 } 
