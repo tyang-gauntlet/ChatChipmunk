@@ -13,7 +13,7 @@ export async function middleware(req: NextRequest) {
   }
 
   if (session && req.nextUrl.pathname === "/auth/login") {
-    return NextResponse.redirect(new URL("/channels", req.url))
+    return NextResponse.redirect(new URL("/", req.url))
   }
 
   return res

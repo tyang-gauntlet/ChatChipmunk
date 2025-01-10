@@ -34,7 +34,7 @@ export default function LoginPage() {
             return
         }
 
-        router.push("/channels")
+        router.push("/")
         router.refresh()
     }
 
@@ -63,7 +63,7 @@ export default function LoginPage() {
             return
         }
 
-        router.push("/channels")
+        router.push("/")
         router.refresh()
     }
 
