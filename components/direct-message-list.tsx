@@ -6,85 +6,67 @@ import { getSupabaseClient } from '@/lib/supabase/client'
 import { User } from '@/lib/types/chat.types'
 import { Button } from './ui/button'
 import { cn } from '@/lib/utils'
-import { usePathname } from 'next/navigation'
+import { usePathname, useSearchParams } from 'next/navigation'
 
 interface DirectMessageListProps {
     onUserSelect: (user: User) => void;
 }
 
 export const DirectMessageList = ({ onUserSelect }: DirectMessageListProps) => {
-    const [users, setUsers] = useState<User[]>([])
-    const [isLoading, setIsLoading] = useState(true)
-    const { getUsers } = useSupabase()
-    const supabase = getSupabaseClient()
-    const pathname = usePathname()
+    const { getUsers } = useSupabase();
+    const [users, setUsers] = useState<User[]>([]);
+    const searchParams = useSearchParams();
+    const activeDmId = searchParams.get('dm');
+    const supabase = getSupabaseClient();
 
     useEffect(() => {
-        const fetchUsers = async () => {
-            try {
-                setIsLoading(true)
-                const data = await getUsers()
-                setUsers(data)
-            } catch (error) {
-                console.error('Failed to fetch users:', error)
-            } finally {
-                setIsLoading(false)
-            }
-        }
+        // Initial users fetch
+        getUsers().then(setUsers);
 
-        fetchUsers()
-
-        // Subscribe to user changes
-        const userChannel = supabase
+        // Subscribe to user status changes
+        const channel = supabase
             .channel('public:users')
             .on('postgres_changes', {
                 event: '*',
                 schema: 'public',
                 table: 'users'
             }, async (payload) => {
-                if (payload.eventType === 'INSERT') {
-                    const { data: newUser } = await supabase
-                        .from('users')
-                        .select('*')
-                        .eq('id', payload.new.id)
-                        .single();
-
-                    if (newUser) {
-                        setUsers(prev => [...prev, newUser as User]);
-                    }
-                } else if (payload.eventType === 'UPDATE') {
+                if (payload.eventType === 'UPDATE') {
                     setUsers(prev => prev.map(user =>
                         user.id === payload.new.id
                             ? { ...user, ...payload.new }
                             : user
                     ));
-                } else if (payload.eventType === 'DELETE') {
-                    setUsers(prev => prev.filter(user => user.id !== payload.old.id));
                 }
             })
-            .subscribe()
+            .subscribe();
 
         return () => {
-            supabase.removeChannel(userChannel)
-        }
-    }, [getUsers])
+            supabase.removeChannel(channel);
+        };
+    }, [getUsers, supabase]);
 
-    if (isLoading) {
-        return <div className="px-4 py-2">Loading users...</div>
-    }
+    // Scroll to active DM
+    useEffect(() => {
+        if (activeDmId) {
+            const userElement = document.getElementById(`dm-${activeDmId}`);
+            if (userElement) {
+                userElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        }
+    }, [activeDmId]);
 
     return (
         <div className="space-y-1">
             {users.map((user) => (
-                <Button
+                <button
                     key={user.id}
-                    variant="ghost"
-                    size="sm"
-                    className={cn(
-                        "w-full justify-start font-normal relative pl-8",
-                        pathname === `/dm/${user.id}` && "bg-accent"
-                    )}
+                    id={`dm-${user.id}`}
                     onClick={() => onUserSelect(user)}
+                    className={cn(
+                        "w-full text-left px-4 py-2 hover:bg-accent rounded-md transition-colors relative pl-8",
+                        activeDmId === user.id && "bg-accent"
+                    )}
                 >
                     <span
                         className={cn(
@@ -92,9 +74,9 @@ export const DirectMessageList = ({ onUserSelect }: DirectMessageListProps) => {
                             user.status === 'online' ? 'bg-green-500' : 'bg-muted'
                         )}
                     />
-                    <span className="truncate">{user.username}</span>
-                </Button>
+                    {user.username}
+                </button>
             ))}
         </div>
-    )
-} 
+    );
+}; 

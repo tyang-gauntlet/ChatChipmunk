@@ -15,23 +15,65 @@ interface MessageListProps {
     className?: string
 }
 
-export const MessageList = ({ channelId, receiverId, parentId, onReply, className }: MessageListProps) => {
+export const MessageList = ({ channelId, receiverId, parentId, onReply, className, highlightId }: MessageListProps) => {
     const [messages, setMessages] = useState<MessageWithUser[]>([])
     const { getChannelMessages, getDirectMessages, subscribeToDirectMessages } = useSupabase()
     const messagesEndRef = useRef<HTMLDivElement>(null)
     const containerRef = useRef<HTMLDivElement>(null)
     const supabase = getSupabaseClient()
 
-    // Scroll to bottom with smooth animation
-    const scrollToBottom = (smooth = true) => {
+    // Add a helper function to wait for all content to load
+    const waitForContentLoad = async (element: HTMLElement) => {
+        // First wait for a tick to ensure React rendering is complete
+        await new Promise(resolve => setTimeout(resolve, 0));
+
+        // Wait for images
+        const images = Array.from(element.getElementsByTagName('img'));
+        const imagePromises = images.map(img => {
+            if (img.complete) return Promise.resolve();
+            return new Promise(resolve => {
+                img.onload = resolve;
+                img.onerror = resolve;
+            });
+        });
+
+        // Wait longer for emojis and reactions to render
+        const waitForElements = (selector: string) => {
+            return new Promise(resolve => {
+                const check = () => {
+                    const elements = element.querySelectorAll(selector);
+                    if (elements.length > 0) {
+                        // Wait an extra tick after finding elements
+                        setTimeout(resolve, 50);
+                    } else {
+                        setTimeout(check, 50);
+                    }
+                };
+                check();
+            });
+        };
+
+        await Promise.all([
+            ...imagePromises,
+            waitForElements('[data-emoji]'),
+            waitForElements('[data-reply-count]')
+        ]);
+
+        // Final delay to ensure all animations and transitions are complete
+        await new Promise(resolve => setTimeout(resolve, 150));
+    };
+
+    // Update the scroll to bottom function
+    const scrollToBottom = async (smooth = true) => {
         if (containerRef.current) {
-            const { scrollHeight, clientHeight } = containerRef.current
+            await waitForContentLoad(containerRef.current);
+            const { scrollHeight, clientHeight } = containerRef.current;
             containerRef.current.scrollTo({
-                top: scrollHeight - clientHeight,
+                top: scrollHeight - clientHeight + 150, // Increased padding
                 behavior: smooth ? 'smooth' : 'auto'
-            })
+            });
         }
-    }
+    };
 
     // Check if scroll is near bottom
     const isNearBottom = () => {
@@ -173,6 +215,28 @@ export const MessageList = ({ channelId, receiverId, parentId, onReply, classNam
         }
     }, [messages]);
 
+    // Update the highlighted message scroll
+    useEffect(() => {
+        if (highlightId && messages.length > 0) {
+            const messageElement = document.getElementById(`message-${highlightId}`);
+            if (messageElement) {
+                (async () => {
+                    await waitForContentLoad(messageElement.parentElement || messageElement);
+                    messageElement.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'center'
+                    });
+                    messageElement.classList.add('bg-accent/50');
+                    setTimeout(() => {
+                        messageElement.classList.remove('bg-accent/50');
+                    }, 2000);
+                })();
+            }
+        } else {
+            scrollToBottom(false);
+        }
+    }, [highlightId, messages]);
+
     return (
         <div
             ref={containerRef}
@@ -185,6 +249,8 @@ export const MessageList = ({ channelId, receiverId, parentId, onReply, classNam
                     key={message.id}
                     message={message}
                     onReply={onReply || (() => { })}
+                    elementId={`message-${message.id}`}
+                    highlight={message.id === highlightId}
                 />
             ))}
             <div ref={messagesEndRef} />

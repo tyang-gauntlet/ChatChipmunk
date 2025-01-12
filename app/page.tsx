@@ -25,6 +25,8 @@ import { CreateChannelDialog } from "@/components/create-channel-dialog"
 import { useSupabase } from "@/hooks/use-supabase-actions"
 import { ThreadHeader } from "@/components/thread-header"
 import { User, Channel, MessageWithUser } from '@/lib/types/chat.types'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { getSupabaseClient } from "@/lib/supabase/client"
 
 interface MessageTarget {
   channelId?: string;
@@ -33,27 +35,47 @@ interface MessageTarget {
 }
 
 export default function Home() {
+  const router = useRouter()
+  const searchParams = useSearchParams()
+
+  // Get params from URL
+  const channelId = searchParams.get('channel')
+  const userId = searchParams.get('dm')
+  const messageId = searchParams.get('message')
+
   const [open, setOpen] = useState(false)
   const [selectedThread, setSelectedThread] = useState<string | null>(null)
   const [currentChannel, setCurrentChannel] = useState<Channel | null>(null)
   const [selectedUser, setSelectedUser] = useState<User | null>(null)
   const [parentMessage, setParentMessage] = useState<MessageWithUser | null>(null)
   const { getChannelMessages, getDirectMessages } = useSupabase()
+  const supabase = getSupabaseClient()
 
+  // Update URL when selection changes
   const handleChannelSelect = (channel: Channel) => {
     setCurrentChannel(channel)
-    setSelectedUser(null)     // Reset DM user when changing to channel
-    setSelectedThread(null)   // Reset thread when changing channels
+    setSelectedUser(null)
+    setSelectedThread(null)
+    router.push(`/?channel=${channel.id}`)
   }
 
   const handleUserSelect = (user: User) => {
     setSelectedUser(user)
-    setCurrentChannel(null)   // Reset channel when switching to DM
-    setSelectedThread(null)   // Reset thread when switching
+    setCurrentChannel(null)
+    setSelectedThread(null)
+    router.push(`/?dm=${user.id}`)
   }
 
   const handleThreadSelect = async (messageId: string) => {
     setSelectedThread(messageId);
+    // Update URL to include message ID
+    const baseUrl = currentChannel
+      ? `/?channel=${currentChannel.id}`
+      : selectedUser
+        ? `/?dm=${selectedUser.id}`
+        : '/';
+    router.push(`${baseUrl}&message=${messageId}`);
+
     try {
       let messages;
       if (currentChannel) {
@@ -72,6 +94,41 @@ export default function Home() {
       console.error('Error fetching thread:', error);
     }
   };
+
+  // Load initial state from URL
+  useEffect(() => {
+    const loadFromUrl = async () => {
+      try {
+        if (channelId) {
+          const { data: channel } = await supabase
+            .from('channels')
+            .select('*')
+            .eq('id', channelId)
+            .single();
+          if (channel) {
+            setCurrentChannel(channel);
+          }
+        } else if (userId) {
+          const { data: user } = await supabase
+            .from('users')
+            .select('*')
+            .eq('id', userId)
+            .single();
+          if (user) {
+            setSelectedUser(user);
+          }
+        }
+
+        if (messageId) {
+          handleThreadSelect(messageId);
+        }
+      } catch (error) {
+        console.error('Error loading from URL:', error);
+      }
+    };
+
+    loadFromUrl();
+  }, [channelId, userId, messageId]);
 
   // Helper function to determine message target
   const getMessageTarget = (): MessageTarget => {
@@ -103,6 +160,18 @@ export default function Home() {
     }
 
     return {};
+  };
+
+  // Update URL when thread is closed
+  const handleThreadClose = () => {
+    setSelectedThread(null);
+    setParentMessage(null);
+    const baseUrl = currentChannel
+      ? `/?channel=${currentChannel.id}`
+      : selectedUser
+        ? `/?dm=${selectedUser.id}`
+        : '/';
+    router.push(baseUrl);
   };
 
   return (
@@ -206,6 +275,7 @@ export default function Home() {
                   channelId={currentChannel?.id}
                   receiverId={selectedUser?.id}
                   onReply={handleThreadSelect}
+                  highlightId={messageId || undefined}
                 />
                 <MessageInput
                   {...getMessageTarget()}
@@ -224,10 +294,7 @@ export default function Home() {
               {selectedThread && (
                 <div className="w-96 border-l flex flex-col">
                   <ThreadHeader
-                    onClose={() => {
-                      setSelectedThread(null);
-                      setParentMessage(null);
-                    }}
+                    onClose={handleThreadClose}
                     parentMessage={parentMessage}
                   />
                   <div className="flex-1 flex flex-col min-h-0">
@@ -235,6 +302,7 @@ export default function Home() {
                       channelId={currentChannel?.id}
                       parentId={selectedThread}
                       receiverId={selectedUser?.id}
+                      highlightId={messageId || undefined}
                     />
                     <MessageInput {...getMessageTarget()} />
                   </div>

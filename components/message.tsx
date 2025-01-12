@@ -16,6 +16,8 @@ import type { MessageWithUser } from '@/lib/types/chat.types'
 interface MessageProps {
     message: MessageWithUser;
     onReply: (messageId: string) => void;
+    elementId?: string;
+    highlight?: boolean;
 }
 
 type ReactionPayload = {
@@ -25,7 +27,7 @@ type ReactionPayload = {
     user_id: string | null;
 };
 
-export default function Message({ message, onReply }: MessageProps) {
+export default function Message({ message, onReply, elementId, highlight }: MessageProps) {
     if (!message) return null;
 
     const { id, content, created_at, attachments, user } = message;
@@ -152,7 +154,9 @@ export default function Message({ message, onReply }: MessageProps) {
 
     return (
         <div
-            className="group flex gap-3 py-2 px-4 hover:bg-accent/50 relative"
+            id={elementId}
+            className={`group flex gap-3 py-2 px-4 hover:bg-accent/50 relative transition-colors duration-200 ${highlight ? 'bg-accent/50' : ''
+                }`}
             onMouseEnter={() => setShowActions(true)}
             onMouseLeave={() => setShowActions(false)}
         >
@@ -197,7 +201,7 @@ export default function Message({ message, onReply }: MessageProps) {
                                     className="flex items-center gap-1 bg-accent rounded-full px-2 py-1 hover:bg-accent/80"
                                     onClick={() => handleReaction(emoji)}
                                 >
-                                    <span>{emoji}</span>
+                                    <span data-emoji>{emoji}</span>
                                     <span className="text-xs">{count}</span>
                                 </button>
                             </div>
@@ -207,7 +211,7 @@ export default function Message({ message, onReply }: MessageProps) {
 
                 {/* Reply Count */}
                 {replyCount > 0 && !message.parent_id && (
-                    <div className="flex items-center gap-1 text-xs text-muted-foreground mt-2">
+                    <div data-reply-count className="flex items-center gap-1 text-xs text-muted-foreground mt-2">
                         <button
                             className="flex items-center gap-1 hover:text-foreground"
                             onClick={() => onReply(id)}

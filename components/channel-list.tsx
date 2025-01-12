@@ -5,7 +5,7 @@ import { Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { cn } from "@/lib/utils"
-import { usePathname } from "next/navigation"
+import { usePathname, useSearchParams } from "next/navigation"
 import { useSupabase } from "@/hooks/use-supabase-actions"
 import { Channel } from "@/lib/types/chat.types"
 import {
@@ -31,6 +31,8 @@ export function ChannelList({ onChannelSelect }: ChannelListProps) {
     const pathname = usePathname()
     const [channelToDelete, setChannelToDelete] = useState<Channel | null>(null)
     const supabase = getSupabaseClient()
+    const searchParams = useSearchParams()
+    const activeChannelId = searchParams.get('channel')
 
     useEffect(() => {
         const fetchChannels = async () => {
@@ -72,6 +74,15 @@ export function ChannelList({ onChannelSelect }: ChannelListProps) {
             supabase.removeChannel(channel)
         }
     }, [supabase])
+
+    useEffect(() => {
+        if (activeChannelId) {
+            const channelElement = document.getElementById(`channel-${activeChannelId}`)
+            if (channelElement) {
+                channelElement.scrollIntoView({ behavior: 'smooth', block: 'center' })
+            }
+        }
+    }, [activeChannelId])
 
     const handleDelete = async () => {
         if (!channelToDelete) return;
