@@ -7,16 +7,15 @@ import { getSupabaseClient } from '@/lib/supabase/client'
 interface MessageInputProps {
     channelId?: string
     parentId?: string
-    receiver_id?: string
+    receiverId?: string
 }
 
-export const MessageInput = ({ channelId, parentId, receiver_id }: MessageInputProps) => {
+export const MessageInput = ({ channelId, parentId, receiverId }: MessageInputProps) => {
     const [content, setContent] = useState('')
     const [isUploading, setIsUploading] = useState(false)
     const [selectedFiles, setSelectedFiles] = useState<File[]>([])
     const fileInputRef = useRef<HTMLInputElement>(null)
-    const supabase = getSupabaseClient()
-    const { uploadFile, getPublicUser } = useSupabase()
+    const { uploadFile, sendDirectMessage, sendMessage } = useSupabase()
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const files = e.target.files
@@ -38,21 +37,11 @@ export const MessageInput = ({ channelId, parentId, receiver_id }: MessageInputP
                 attachments = await Promise.all(selectedFiles.map(uploadFile))
             }
 
-            const user = await getPublicUser()
-            if (!user) throw new Error('User not found')
-
-            // Create message with attachments
-            const { error } = await supabase
-                .from('messages')
-                .insert({
-                    user_id: user.id,
-                    content: content.trim(),
-                    channel_id: channelId || null,
-                    parent_id: parentId || null,
-                    attachments: attachments
-                })
-
-            if (error) throw error
+            if (receiverId) {
+                await sendDirectMessage(receiverId, content, attachments)
+            } else {
+                await sendMessage(content, channelId, parentId, attachments)
+            }
 
             // Reset form
             setContent('')

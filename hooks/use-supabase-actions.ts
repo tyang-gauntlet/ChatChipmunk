@@ -218,41 +218,92 @@ export const useSupabase = () => {
     }, [supabase, getPublicUser]);
 
     // Direct Messages
-    const getDirectMessages = useCallback(async (userId: string) => {
-        const user = await getPublicUser();
+    const getDirectMessages = useCallback(async (receiverId: string): Promise<MessageWithUser[]> => {
+        try {
+            const user = await getPublicUser();
+            if (!user) throw new Error('No user found');
 
-        const { data, error } = await supabase
-            .from('direct_messages')
-            .select(`
-                *,
-                sender:sender_id(id, full_name, avatar_url),
-                receiver:receiver_id(id, full_name, avatar_url)
-            `)
-            .or(`sender_id.eq.${user?.id},receiver_id.eq.${user?.id}`)
-            .order('created_at', { ascending: true });
-        if (error) throw error;
-        return data;
-    }, [supabase,]);
+            const { data, error } = await supabase
+                .from('messages')
+                .select(`
+                    *,
+                    user:users!inner (
+                        id,
+                        username,
+                        status
+                    ),
+                    direct_messages!inner (
+                        sender_id,
+                        receiver_id
+                    )
+                `)
+                .filter('direct_messages.sender_id', 'in', `(${user.id},${receiverId})`)
+                .filter('direct_messages.receiver_id', 'in', `(${user.id},${receiverId})`)
+                .order('created_at', { ascending: true });
+
+            console.log('Direct messages query result:', { data, error });
+
+            if (error) throw error;
+            return data as unknown as MessageWithUser[];
+        } catch (error) {
+            console.error('Error fetching direct messages:', error);
+            throw error;
+        }
+    }, [supabase]);
 
     const sendDirectMessage = useCallback(async (
         receiverId: string,
         content: string,
         attachments?: any[]
     ) => {
-        const user = await getPublicUser();
+        try {
+            const user = await getPublicUser();
+            if (!user) throw new Error('No user found');
 
-        const { data, error } = await supabase
-            .from('direct_messages')
-            .insert({
-                sender_id: user?.id,
-                receiver_id: receiverId,
-                content,
-                attachments,
-            })
-            .select()
-            .single();
-        if (error) throw error;
-        return data;
+            // First create the message
+            const { data: message, error: messageError } = await supabase
+                .from('messages')
+                .insert({
+                    content,
+                    user_id: user.id,
+                    attachments,
+                    created_at: new Date().toISOString()
+                })
+                .select('*')
+                .single();
+
+            if (messageError) {
+                console.error('Message creation failed:', messageError);
+                throw messageError;
+            }
+
+            console.log('Message created:', message);
+
+            // Directly insert into direct_messages
+            const { data: dm, error: dmError } = await supabase
+                .from('direct_messages')
+                .insert({
+                    id: message.id,
+                    sender_id: user.id,
+                    receiver_id: receiverId
+                })
+                .select()
+                .single();
+
+            console.log('Direct message attempt:', { dm, dmError });
+
+            if (dmError) {
+                console.error('Direct message creation failed:', dmError);
+                // Cleanup the message
+                await supabase.from('messages').delete().eq('id', message.id);
+                throw dmError;
+            }
+
+            return message;
+        } catch (error) {
+            console.error('Send direct message failed:', error);
+            throw error;
+        }
     }, [supabase]);
 
     // Reactions
@@ -372,7 +423,46 @@ export const useSupabase = () => {
         }
     }
 
+    const subscribeToDirectMessages = useCallback((receiverId: string, callback: (message: MessageWithUser) => void) => {
+        const user = getPublicUser();
+        if (!user) return;
 
+        const channel = supabase
+            .channel('direct_messages')
+            .on(
+                'postgres_changes',
+                {
+                    event: 'INSERT',
+                    schema: 'public',
+                    table: 'direct_messages',
+                    filter: `sender_id=in.(${user.id},${receiverId})&receiver_id=in.(${user.id},${receiverId})`
+                },
+                async (payload) => {
+                    // Fetch the complete message with user data
+                    const { data: message } = await supabase
+                        .from('messages')
+                        .select(`
+                            *,
+                            user:users!inner (
+                                id,
+                                username,
+                                status
+                            )
+                        `)
+                        .eq('id', payload.new.id)
+                        .single();
+
+                    if (message) {
+                        callback(message as MessageWithUser);
+                    }
+                }
+            )
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
+    }, [supabase]);
 
     return {
         getPublicUser,
@@ -396,6 +486,7 @@ export const useSupabase = () => {
         // Users
         updateUserStatus,
         getUsers,
-        uploadFile
+        uploadFile,
+        subscribeToDirectMessages
     };
 }; 

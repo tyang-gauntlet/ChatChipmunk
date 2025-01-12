@@ -26,23 +26,30 @@ import { useSupabase } from "@/hooks/use-supabase-actions"
 import { ThreadHeader } from "@/components/thread-header"
 import { User, Channel, MessageWithUser } from '@/lib/types/chat.types'
 
+interface MessageTarget {
+  channelId?: string;
+  receiverId?: string;
+  parentId?: string;
+}
+
 export default function Home() {
   const [open, setOpen] = useState(false)
   const [selectedThread, setSelectedThread] = useState<string | null>(null)
   const [currentChannel, setCurrentChannel] = useState<Channel | null>(null)
   const [selectedUser, setSelectedUser] = useState<User | null>(null)
   const [parentMessage, setParentMessage] = useState<MessageWithUser | null>(null)
-  const { getChannelMessages } = useSupabase()
+  const { getChannelMessages, getDirectMessages } = useSupabase()
 
   const handleChannelSelect = (channel: Channel) => {
     setCurrentChannel(channel)
-    setSelectedThread(null) // Reset thread when changing channels
+    setSelectedUser(null)     // Reset DM user when changing to channel
+    setSelectedThread(null)   // Reset thread when changing channels
   }
 
   const handleUserSelect = (user: User) => {
     setSelectedUser(user)
-    setCurrentChannel(null) // Reset channel when switching to DM
-    setSelectedThread(null)
+    setCurrentChannel(null)   // Reset channel when switching to DM
+    setSelectedThread(null)   // Reset thread when switching
   }
 
   const handleThreadSelect = async (messageId: string) => {
@@ -58,6 +65,30 @@ export default function Home() {
         console.error('Error fetching thread:', error);
       }
     }
+  };
+
+  // Helper function to determine message target
+  const getMessageTarget = (): MessageTarget => {
+    if (selectedThread && currentChannel?.id) {
+      return {
+        channelId: currentChannel.id,
+        parentId: selectedThread
+      };
+    }
+
+    if (selectedUser?.id) {
+      return {
+        receiverId: selectedUser.id
+      };
+    }
+
+    if (currentChannel?.id) {
+      return {
+        channelId: currentChannel.id
+      };
+    }
+
+    return {};
   };
 
   return (
@@ -142,25 +173,27 @@ export default function Home() {
 
         {/* Message Area */}
         <main className="flex-1 flex flex-col min-w-0">
-          {/* Channel header */}
+          {/* Header */}
           <div className="border-b p-4">
             <h2 className="font-semibold">
               {currentChannel
                 ? `# ${currentChannel.name}`
                 : selectedUser
-                  ? `${selectedUser.username}`
+                  ? `💬 ${selectedUser.username}`
                   : 'Select a channel or user'}
             </h2>
           </div>
 
-          {currentChannel ? (
+          {/* Messages */}
+          {(currentChannel || selectedUser) ? (
             <div className="flex-1 flex min-h-0">
               <div className="flex-1 flex flex-col">
                 <MessageList
-                  channelId={currentChannel.id}
+                  channelId={currentChannel?.id}
+                  receiverId={selectedUser?.id}
                   onReply={handleThreadSelect}
                 />
-                <MessageInput channelId={currentChannel.id} />
+                <MessageInput {...getMessageTarget()} />
               </div>
 
               {selectedThread && (
@@ -177,17 +210,14 @@ export default function Home() {
                       channelId={currentChannel?.id}
                       parentId={selectedThread}
                     />
-                    <MessageInput
-                      channelId={currentChannel?.id}
-                      parentId={selectedThread}
-                    />
+                    <MessageInput {...getMessageTarget()} />
                   </div>
                 </div>
               )}
             </div>
           ) : (
             <div className="flex-1 flex items-center justify-center text-muted-foreground">
-              Select a channel to start messaging
+              Select a channel or user to start messaging
             </div>
           )}
         </main>

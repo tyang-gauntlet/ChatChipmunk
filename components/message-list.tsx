@@ -14,9 +14,9 @@ interface MessageListProps {
     onReply?: (id: string) => void
 }
 
-export const MessageList = ({ channelId, parentId, receiverId, highlightId, onReply }: MessageListProps) => {
+export const MessageList = ({ channelId, receiverId, parentId, onReply }: MessageListProps) => {
     const [messages, setMessages] = useState<MessageWithUser[]>([])
-    const { getChannelMessages, getThreadMessages } = useSupabase()
+    const { getChannelMessages, getDirectMessages, subscribeToDirectMessages } = useSupabase()
     const messagesEndRef = useRef<HTMLDivElement>(null)
     const containerRef = useRef<HTMLDivElement>(null)
     const supabase = getSupabaseClient()
@@ -42,65 +42,118 @@ export const MessageList = ({ channelId, parentId, receiverId, highlightId, onRe
     }
 
     useEffect(() => {
-        const fetchMessages = async () => {
+        const loadMessages = async () => {
             try {
-                if (!channelId && !parentId) return;
-
-                // Fetch either channel messages or thread messages
-                const data = parentId
-                    ? await getThreadMessages(parentId)
-                    : await getChannelMessages(channelId!);
-
-                // Filter out messages that have a parent_id when in channel view
-                const filteredMessages = !parentId
-                    ? data.filter(message => !message.parent_id)
-                    : data;
-
-                console.log('Fetched messages:', filteredMessages);
-                setMessages(filteredMessages);
-                scrollToBottom(false);
+                let fetchedMessages: MessageWithUser[] = [];
+                if (parentId) {
+                    // For threads, get messages with this parent_id
+                    const { data } = await supabase
+                        .from('messages')
+                        .select(`
+                            *,
+                            user:users!inner (
+                                id,
+                                username,
+                                status
+                            )
+                        `)
+                        .eq('parent_id', parentId)
+                        .order('created_at', { ascending: true });
+                    fetchedMessages = data as MessageWithUser[];
+                } else if (receiverId) {
+                    fetchedMessages = await getDirectMessages(receiverId);
+                } else if (channelId) {
+                    const messages = await getChannelMessages(channelId);
+                    // For channel view, only show messages without parent_id
+                    fetchedMessages = messages.filter(m => !m.parent_id);
+                }
+                setMessages(fetchedMessages);
+                scrollToBottom();
             } catch (error) {
-                console.error('Failed to fetch messages:', error);
+                console.error('Error loading messages:', error);
             }
         };
 
-        fetchMessages();
+        loadMessages();
 
-        // Subscribe to new messages
-        const channel = supabase
-            .channel(`messages:${channelId}`)
-            .on('postgres_changes', {
-                event: 'INSERT',
-                schema: 'public',
-                table: 'messages',
-                filter: `channel_id=eq.${channelId}`
-            }, async (payload) => {
-                const { data: messageWithUser } = await supabase
-                    .from('messages')
-                    .select(`
-                        *,
-                        user:users!inner (
-                            id,
-                            username,
-                            status
-                        )
-                    `)
-                    .eq('id', payload.new.id)
-                    .single();
+        // Set up subscriptions
+        if (parentId) {
+            // Thread subscription
+            const channel = supabase
+                .channel(`thread:${parentId}`)
+                .on('postgres_changes', {
+                    event: 'INSERT',
+                    schema: 'public',
+                    table: 'messages',
+                    filter: `parent_id=eq.${parentId}`
+                }, async (payload) => {
+                    const { data: messageWithUser } = await supabase
+                        .from('messages')
+                        .select(`
+                            *,
+                            user:users!inner (
+                                id,
+                                username,
+                                status
+                            )
+                        `)
+                        .eq('id', payload.new.id)
+                        .single();
 
-                if (messageWithUser) {
-                    setMessages(prev => [...prev, messageWithUser as MessageWithUser])
-                    if (isNearBottom()) {
-                        scrollToBottom(true)
+                    if (messageWithUser) {
+                        setMessages(prev => [...prev, messageWithUser as MessageWithUser]);
+                        scrollToBottom(true);
                     }
-                }
-            })
-            .subscribe()
+                })
+                .subscribe();
 
-        return () => {
-            supabase.removeChannel(channel)
+            return () => {
+                supabase.removeChannel(channel);
+            };
+        } else if (receiverId) {
+            // DM subscription
+            const unsubscribe = subscribeToDirectMessages(receiverId, (newMessage) => {
+                setMessages(prev => [...prev, newMessage]);
+                scrollToBottom();
+            });
+            return () => unsubscribe?.();
+        } else if (channelId) {
+            // Channel subscription
+            const channel = supabase
+                .channel(`messages:${channelId}`)
+                .on('postgres_changes', {
+                    event: 'INSERT',
+                    schema: 'public',
+                    table: 'messages',
+                    filter: `channel_id=eq.${channelId}`
+                }, async (payload) => {
+                    const { data: messageWithUser } = await supabase
+                        .from('messages')
+                        .select(`
+                            *,
+                            user:users!inner (
+                                id,
+                                username,
+                                status
+                            )
+                        `)
+                        .eq('id', payload.new.id)
+                        .single();
+
+                    if (messageWithUser && !messageWithUser.parent_id) {  // Only add if not a thread reply
+                        setMessages(prev => [...prev, messageWithUser as MessageWithUser]);
+                        if (isNearBottom()) {
+                            scrollToBottom(true);
+                        }
+                    }
+                })
+                .subscribe();
+
+            return () => {
+                supabase.removeChannel(channel);
+            };
         }
-    }, [channelId, parentId, getChannelMessages, getThreadMessages])
+    }, [channelId, receiverId, parentId]);
 
     return (
         <div
