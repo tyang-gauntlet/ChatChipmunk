@@ -24,15 +24,15 @@ import { Plus } from "lucide-react"
 import { CreateChannelDialog } from "@/components/create-channel-dialog"
 import { useSupabase } from "@/hooks/use-supabase-actions"
 import { ThreadHeader } from "@/components/thread-header"
-import { User, Channel, Message } from '@/lib/types/chat.types'
+import { User, Channel, MessageWithUser } from '@/lib/types/chat.types'
 
 export default function Home() {
   const [open, setOpen] = useState(false)
   const [selectedThread, setSelectedThread] = useState<string | null>(null)
   const [currentChannel, setCurrentChannel] = useState<Channel | null>(null)
   const [selectedUser, setSelectedUser] = useState<User | null>(null)
-  const [parentMessage, setParentMessage] = useState<Message | null>(null)
-  const { getMessages } = useSupabase()
+  const [parentMessage, setParentMessage] = useState<MessageWithUser | null>(null)
+  const { getChannelMessages } = useSupabase()
 
   const handleChannelSelect = (channel: Channel) => {
     setCurrentChannel(channel)
@@ -45,24 +45,20 @@ export default function Home() {
     setSelectedThread(null)
   }
 
-  useEffect(() => {
-    const fetchParentMessage = async () => {
-      if (!selectedThread) {
-        setParentMessage(null)
-        return
-      }
-
+  const handleThreadSelect = async (messageId: string) => {
+    setSelectedThread(messageId);
+    if (currentChannel) {
       try {
-        const messages = await getMessages(currentChannel!.id)
-        const parent = messages.find(m => m.id === selectedThread)
-        setParentMessage(parent || null)
+        const messages = await getChannelMessages(currentChannel.id);
+        const parent = messages.find(m => m.id === messageId);
+        if (parent) {
+          setParentMessage(parent);
+        }
       } catch (error) {
-        console.error('Error fetching parent message:', error)
+        console.error('Error fetching thread:', error);
       }
     }
-
-    fetchParentMessage()
-  }, [selectedThread, currentChannel, getMessages])
+  };
 
   return (
     <div className="flex flex-col h-screen w-full">
@@ -152,7 +148,7 @@ export default function Home() {
               {currentChannel
                 ? `# ${currentChannel.name}`
                 : selectedUser
-                  ? `${selectedUser.email}`
+                  ? `${selectedUser.username}`
                   : 'Select a channel or user'}
             </h2>
           </div>
@@ -162,7 +158,7 @@ export default function Home() {
               <div className="flex-1 flex flex-col">
                 <MessageList
                   channelId={currentChannel.id}
-                  onReply={(messageId) => setSelectedThread(messageId)}
+                  onReply={handleThreadSelect}
                 />
                 <MessageInput channelId={currentChannel.id} />
               </div>
@@ -170,17 +166,19 @@ export default function Home() {
               {selectedThread && (
                 <div className="w-96 border-l flex flex-col">
                   <ThreadHeader
-                    onClose={() => setSelectedThread(null)}
+                    onClose={() => {
+                      setSelectedThread(null);
+                      setParentMessage(null);
+                    }}
                     parentMessage={parentMessage}
                   />
                   <div className="flex-1 flex flex-col min-h-0">
                     <MessageList
-                      channelId={null}
+                      channelId={currentChannel?.id}
                       parentId={selectedThread}
-                      onReply={() => { }}
                     />
                     <MessageInput
-                      channelId={currentChannel.id}
+                      channelId={currentChannel?.id}
                       parentId={selectedThread}
                     />
                   </div>

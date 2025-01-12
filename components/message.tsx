@@ -172,7 +172,10 @@ export default function Message({ message, onReply }: MessageProps) {
                     <div className="flex items-center gap-1 text-xs text-muted-foreground mt-2">
                         <button
                             className="flex items-center gap-1 hover:text-foreground"
-                            onClick={() => onReply(id)}
+                            onClick={() => {
+                                console.log('Reply clicked:', id);
+                                onReply(id);
+                            }}
                         >
                             <MessageSquareIcon className="h-3 w-3" />
                             <span>{replyCount}</span>
@@ -205,7 +208,10 @@ export default function Message({ message, onReply }: MessageProps) {
                             variant="ghost"
                             size="icon"
                             className="h-8 w-8"
-                            onClick={() => onReply(id)}
+                            onClick={() => {
+                                console.log('Reply clicked:', id);
+                                onReply(id);
+                            }}
                         >
                             <MessageSquareIcon className="h-4 w-4" />
                         </Button>

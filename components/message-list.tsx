@@ -11,11 +11,12 @@ interface MessageListProps {
     parentId?: string | null
     receiverId?: string | null
     highlightId?: string
+    onReply?: (id: string) => void
 }
 
-export const MessageList = ({ channelId, parentId, receiverId, highlightId }: MessageListProps) => {
+export const MessageList = ({ channelId, parentId, receiverId, highlightId, onReply }: MessageListProps) => {
     const [messages, setMessages] = useState<MessageWithUser[]>([])
-    const { getChannelMessages } = useSupabase()
+    const { getChannelMessages, getThreadMessages } = useSupabase()
     const messagesEndRef = useRef<HTMLDivElement>(null)
     const containerRef = useRef<HTMLDivElement>(null)
     const supabase = getSupabaseClient()
@@ -43,22 +44,22 @@ export const MessageList = ({ channelId, parentId, receiverId, highlightId }: Me
     useEffect(() => {
         const fetchMessages = async () => {
             try {
-                if (!channelId) return
-                const data = await getChannelMessages(channelId)
-                // Sort messages by created_at
-                const sortedMessages = [...data].sort((a, b) => {
-                    const dateA = a.created_at ? new Date(a.created_at).getTime() : 0;
-                    const dateB = b.created_at ? new Date(b.created_at).getTime() : 0;
-                    return dateA - dateB;
-                });
-                setMessages(sortedMessages)
-                scrollToBottom(false)
-            } catch (error) {
-                console.error('Failed to fetch messages:', error)
-            }
-        }
+                if (!channelId && !parentId) return;
 
-        fetchMessages()
+                // Fetch either channel messages or thread messages
+                const data = parentId
+                    ? await getThreadMessages(parentId)
+                    : await getChannelMessages(channelId!);
+
+                console.log('Fetched messages:', data); // Debug log
+                setMessages(data);
+                scrollToBottom(false);
+            } catch (error) {
+                console.error('Failed to fetch messages:', error);
+            }
+        };
+
+        fetchMessages();
 
         // Subscribe to new messages
         const channel = supabase
@@ -94,7 +95,7 @@ export const MessageList = ({ channelId, parentId, receiverId, highlightId }: Me
         return () => {
             supabase.removeChannel(channel)
         }
-    }, [channelId, getChannelMessages])
+    }, [channelId, parentId, getChannelMessages, getThreadMessages])
 
     return (
         <div
@@ -105,7 +106,7 @@ export const MessageList = ({ channelId, parentId, receiverId, highlightId }: Me
                 <Message
                     key={message.id}
                     message={message}
-                    onReply={() => { }}
+                    onReply={onReply || (() => { })}
                 />
             ))}
             <div ref={messagesEndRef} className="h-1" />
