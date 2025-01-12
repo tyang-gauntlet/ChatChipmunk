@@ -28,12 +28,50 @@ type ReactionPayload = {
 export default function Message({ message, onReply }: MessageProps) {
     if (!message) return null;
 
-    const { id, content, created_at, attachments, user, threads } = message;
+    const { id, content, created_at, attachments, user } = message;
     const [showActions, setShowActions] = useState(false);
     const [currentReactions, setCurrentReactions] = useState<ReactionPayload[]>([]);
     const { addReaction, removeReaction } = useSupabase();
 
-    const replyCount = threads?.length || 0;
+    const [replyCount, setReplyCount] = useState(0);
+    const supabase = getSupabaseClient();
+
+    // Initial reply count fetch
+    useEffect(() => {
+        getReplyCount().then(setReplyCount);
+
+        // Subscribe to changes in messages with this parent_id
+        const channel = supabase
+            .channel(`thread_count:${id}`)
+            .on(
+                'postgres_changes',
+                {
+                    event: '*', // Listen to all events (INSERT, DELETE)
+                    schema: 'public',
+                    table: 'messages',
+                    filter: `parent_id=eq.${id}`
+                },
+                async () => {
+                    // Refetch count when messages change
+                    const newCount = await getReplyCount();
+                    setReplyCount(newCount);
+                }
+            )
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
+    }, [id]);
+
+    const getReplyCount = async () => {
+        const { count } = await supabase
+            .from('messages')
+            .select('*', { count: 'exact', head: true })
+            .eq('parent_id', id);
+
+        return count || 0;
+    };
 
     const fetchReactions = async () => {
         const supabase = getSupabaseClient();
@@ -168,14 +206,11 @@ export default function Message({ message, onReply }: MessageProps) {
                 )}
 
                 {/* Reply Count */}
-                {replyCount > 0 && (
+                {replyCount > 0 && !message.parent_id && (
                     <div className="flex items-center gap-1 text-xs text-muted-foreground mt-2">
                         <button
                             className="flex items-center gap-1 hover:text-foreground"
-                            onClick={() => {
-                                console.log('Reply clicked:', id);
-                                onReply(id);
-                            }}
+                            onClick={() => onReply(id)}
                         >
                             <MessageSquareIcon className="h-3 w-3" />
                             <span>{replyCount}</span>
@@ -203,19 +238,18 @@ export default function Message({ message, onReply }: MessageProps) {
                         </PopoverContent>
                     </Popover>
 
-                    <div className="relative">
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8"
-                            onClick={() => {
-                                console.log('Reply clicked:', id);
-                                onReply(id);
-                            }}
-                        >
-                            <MessageSquareIcon className="h-4 w-4" />
-                        </Button>
-                    </div>
+                    {!message.parent_id && (
+                        <div className="relative">
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8"
+                                onClick={() => onReply(id)}
+                            >
+                                <MessageSquareIcon className="h-4 w-4" />
+                            </Button>
+                        </div>
+                    )}
                 </div>
             )}
         </div>

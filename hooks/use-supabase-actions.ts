@@ -235,13 +235,12 @@ export const useSupabase = () => {
                     direct_messages!inner (
                         sender_id,
                         receiver_id
-                    )
+                    ),
+                    threads:messages!parent_id(*)
                 `)
                 .filter('direct_messages.sender_id', 'in', `(${user.id},${receiverId})`)
                 .filter('direct_messages.receiver_id', 'in', `(${user.id},${receiverId})`)
                 .order('created_at', { ascending: true });
-
-            console.log('Direct messages query result:', { data, error });
 
             if (error) throw error;
             return data as unknown as MessageWithUser[];
@@ -254,21 +253,27 @@ export const useSupabase = () => {
     const sendDirectMessage = useCallback(async (
         receiverId: string,
         content: string,
-        attachments?: any[]
+        attachments?: any[],
+        parentId?: string
     ) => {
+        console.log('sendDirectMessage called with:', { receiverId, content, parentId }); // Debug log
         try {
             const user = await getPublicUser();
             if (!user) throw new Error('No user found');
 
-            // First create the message
+            const messageData = {
+                content,
+                user_id: user.id,
+                attachments,
+                parent_id: parentId,
+                created_at: new Date().toISOString()
+            };
+
+            console.log('Creating message with data:', messageData); // Debug log
+
             const { data: message, error: messageError } = await supabase
                 .from('messages')
-                .insert({
-                    content,
-                    user_id: user.id,
-                    attachments,
-                    created_at: new Date().toISOString()
-                })
+                .insert(messageData)
                 .select('*')
                 .single();
 
@@ -277,26 +282,20 @@ export const useSupabase = () => {
                 throw messageError;
             }
 
-            console.log('Message created:', message);
+            // Only create direct_message entry if it's not a thread reply
+            if (!parentId) {
+                const { error: dmError } = await supabase
+                    .from('direct_messages')
+                    .insert({
+                        id: message.id,
+                        sender_id: user.id,
+                        receiver_id: receiverId
+                    });
 
-            // Directly insert into direct_messages
-            const { data: dm, error: dmError } = await supabase
-                .from('direct_messages')
-                .insert({
-                    id: message.id,
-                    sender_id: user.id,
-                    receiver_id: receiverId
-                })
-                .select()
-                .single();
-
-            console.log('Direct message attempt:', { dm, dmError });
-
-            if (dmError) {
-                console.error('Direct message creation failed:', dmError);
-                // Cleanup the message
-                await supabase.from('messages').delete().eq('id', message.id);
-                throw dmError;
+                if (dmError) {
+                    await supabase.from('messages').delete().eq('id', message.id);
+                    throw dmError;
+                }
             }
 
             return message;
@@ -431,7 +430,6 @@ export const useSupabase = () => {
             console.error('No authenticated user found');
             return;
         }
-        console.log('Current user:', user.id);
 
         const channel = supabase
             .channel(`direct_messages:${user.id}:${receiverId}`)
@@ -440,8 +438,8 @@ export const useSupabase = () => {
                 {
                     event: 'INSERT',
                     schema: 'public',
-                    table: 'direct_messages',
-                    filter: `sender_id=in.(${user.id},${receiverId})`
+                    table: 'messages',
+                    filter: `user_id=in.(${user.id},${receiverId}) and parent_id=is.null`
                 },
                 async (payload) => {
                     console.log('Received DM payload:', payload);
@@ -464,15 +462,14 @@ export const useSupabase = () => {
                         return;
                     }
 
-                    if (message) {
+                    // Only process messages that are not thread replies
+                    if (message && !message.parent_id) {
                         console.log('Processing DM message:', message);
                         callback(message as MessageWithUser);
                     }
                 }
             )
             .subscribe();
-
-        console.log('DM subscription channel created:', channel.state);
 
         return () => {
             console.log('Cleaning up DM subscription');

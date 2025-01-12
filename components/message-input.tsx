@@ -32,14 +32,15 @@ export const MessageInput = ({ channelId, parentId, receiverId, onMessageSent }:
         try {
             let attachments: { file_name: string; file_size: number; file_type: string; url: string }[] = []
 
-            // Handle file uploads if any
             if (selectedFiles.length > 0) {
                 setIsUploading(true)
                 attachments = await Promise.all(selectedFiles.map(uploadFile))
             }
 
+            console.log('MessageInput sending with:', { receiverId, content, attachments, parentId })
+
             if (receiverId) {
-                await sendDirectMessage(receiverId, content, attachments)
+                await sendDirectMessage(receiverId, content, attachments, parentId)
             } else {
                 await sendMessage(content, channelId, parentId, attachments)
             }

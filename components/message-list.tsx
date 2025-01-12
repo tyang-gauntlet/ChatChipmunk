@@ -62,14 +62,14 @@ export const MessageList = ({ channelId, receiverId, parentId, onReply, classNam
                         .order('created_at', { ascending: true });
                     fetchedMessages = data as MessageWithUser[];
                 } else if (receiverId) {
-                    fetchedMessages = await getDirectMessages(receiverId);
+                    const messages = await getDirectMessages(receiverId);
+                    // Filter out thread messages from DM view
+                    fetchedMessages = messages.filter(m => !m.parent_id);
                 } else if (channelId) {
                     const messages = await getChannelMessages(channelId);
-                    // For channel view, only show messages without parent_id
                     fetchedMessages = messages.filter(m => !m.parent_id);
                 }
                 setMessages(fetchedMessages);
-                // Use setTimeout to ensure DOM has updated
                 setTimeout(() => scrollToBottom(false), 100);
             } catch (error) {
                 console.error('Error loading messages:', error);
@@ -116,7 +116,10 @@ export const MessageList = ({ channelId, receiverId, parentId, onReply, classNam
             // DM subscription
             let cleanup: (() => void) | undefined;
             subscribeToDirectMessages(receiverId, (newMessage) => {
-                setMessages(prev => [...prev, newMessage]);
+                // Only add the message if it's not a thread reply
+                if (!newMessage.parent_id) {
+                    setMessages(prev => [...prev, newMessage]);
+                }
             }).then(unsubscribe => {
                 cleanup = unsubscribe;
             });

@@ -54,26 +54,40 @@ export default function Home() {
 
   const handleThreadSelect = async (messageId: string) => {
     setSelectedThread(messageId);
-    if (currentChannel) {
-      try {
-        const messages = await getChannelMessages(currentChannel.id);
+    try {
+      let messages;
+      if (currentChannel) {
+        messages = await getChannelMessages(currentChannel.id);
+      } else if (selectedUser) {
+        messages = await getDirectMessages(selectedUser.id);
+      }
+
+      if (messages) {
         const parent = messages.find(m => m.id === messageId);
         if (parent) {
           setParentMessage(parent);
         }
-      } catch (error) {
-        console.error('Error fetching thread:', error);
       }
+    } catch (error) {
+      console.error('Error fetching thread:', error);
     }
   };
 
   // Helper function to determine message target
   const getMessageTarget = (): MessageTarget => {
-    if (selectedThread && currentChannel?.id) {
-      return {
-        channelId: currentChannel.id,
-        parentId: selectedThread
-      };
+    if (selectedThread) {
+      if (currentChannel?.id) {
+        return {
+          channelId: currentChannel.id,
+          parentId: selectedThread
+        };
+      }
+      if (selectedUser?.id) {
+        return {
+          receiverId: selectedUser.id,
+          parentId: selectedThread
+        };
+      }
     }
 
     if (selectedUser?.id) {
@@ -220,6 +234,7 @@ export default function Home() {
                     <MessageList
                       channelId={currentChannel?.id}
                       parentId={selectedThread}
+                      receiverId={selectedUser?.id}
                     />
                     <MessageInput {...getMessageTarget()} />
                   </div>
