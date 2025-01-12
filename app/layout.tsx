@@ -1,5 +1,5 @@
 import { Metadata } from 'next'
-import ClientLayout from './client-layout'
+import ClientLayout from '@/app/client-layout'
 import "./globals.css"
 
 export const metadata: Metadata = {

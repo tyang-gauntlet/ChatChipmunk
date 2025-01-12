@@ -51,8 +51,13 @@ export const MessageList = ({ channelId, parentId, receiverId, highlightId, onRe
                     ? await getThreadMessages(parentId)
                     : await getChannelMessages(channelId!);
 
-                console.log('Fetched messages:', data); // Debug log
-                setMessages(data);
+                // Filter out messages that have a parent_id when in channel view
+                const filteredMessages = !parentId
+                    ? data.filter(message => !message.parent_id)
+                    : data;
+
+                console.log('Fetched messages:', filteredMessages);
+                setMessages(filteredMessages);
                 scrollToBottom(false);
             } catch (error) {
                 console.error('Failed to fetch messages:', error);
@@ -100,8 +105,10 @@ export const MessageList = ({ channelId, parentId, receiverId, highlightId, onRe
     return (
         <div
             ref={containerRef}
-            className="flex-1 overflow-y-auto p-4 flex flex-col justify-end"
+            className="flex-1 overflow-y-auto p-4 flex flex-col min-h-0"
+            style={{ maxHeight: 'calc(100vh - 180px)' }}
         >
+            <div className="flex-1" />
             {messages.map((message) => (
                 <Message
                     key={message.id}
