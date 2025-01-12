@@ -9,25 +9,27 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { useSupabase } from '@/lib/hooks/use-supabase-actions'
+import { useAuth } from '@/hooks/use-auth'
+import { useSupabase } from "@/hooks/use-supabase-actions"
 
 export function UserNav() {
     const [userInitial, setUserInitial] = useState("")
     const router = useRouter()
-    const { supabase } = useSupabase()
+    const { signOut } = useAuth()
+    const { getPublicUser } = useSupabase()
 
     useEffect(() => {
-        const getUser = async () => {
-            const { data: { user } } = await supabase.auth.getUser()
-            if (user?.email) {
-                setUserInitial(user.email[0].toUpperCase())
+        const getUsername = async () => {
+            const user = await getPublicUser()
+            if (user?.username) {
+                setUserInitial(user.username.toUpperCase())
             }
         }
-        getUser()
-    }, [supabase])
+        getUsername()
+    }, [])
 
     const handleSignOut = async () => {
-        await supabase.auth.signOut()
+        await signOut()
         router.push("/login")
     }
 

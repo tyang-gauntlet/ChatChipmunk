@@ -1,22 +1,19 @@
 "use client"
 
 import { useEffect, useRef, useState } from 'react'
-import { Message } from './message'
-import type { DirectMessage } from '@/lib/types/direct-message'
-import { useSupabase } from '@/lib/hooks/use-supabase'
+import Message from './message'
+import { useSupabase } from '@/hooks/use-supabase-actions'
 import { getSupabaseClient } from '@/lib/supabase/client'
-import type { User } from '@supabase/supabase-js'
+import type { Message as MessageType } from '@/lib/types/chat.types'
 
 interface DirectMessageListProps {
     userId?: string;
-    onReply?: (messageId: string) => void;
-    onUserSelect?: (user: User) => void;
 }
 
-export const DirectMessageList = ({ userId, onReply }: DirectMessageListProps) => {
+export const DirectMessageList = ({ userId }: DirectMessageListProps) => {
     const { getDirectMessages } = useSupabase()
     const messagesEndRef = useRef<HTMLDivElement>(null)
-    const [messages, setMessages] = useState<DirectMessage[]>([])
+    const [messages, setMessages] = useState<MessageType[]>([])
     const [isLoading, setIsLoading] = useState(true)
     const supabase = getSupabaseClient()
 
@@ -52,7 +49,7 @@ export const DirectMessageList = ({ userId, onReply }: DirectMessageListProps) =
                 filter: `sender_id=eq.${userId}`
             }, (payload) => {
                 if (payload.eventType === 'INSERT') {
-                    setMessages(prev => [...prev, payload.new as DirectMessage])
+                    setMessages(prev => [...prev, payload.new as MessageType])
                     setTimeout(scrollToBottom, 100)
                 }
             })
@@ -73,19 +70,19 @@ export const DirectMessageList = ({ userId, onReply }: DirectMessageListProps) =
             {messages.map((message) => (
                 <Message
                     key={message.id}
-                    id={message.id}
-                    content={message.content}
-                    attachments={message.attachments}
-                    createdAt={message.created_at}
-                    user={{
-                        id: message.sender.id,
-                        fullName: message.sender.full_name,
-                        avatarUrl: message.sender.avatar_url || undefined
-                    }}
-                    onReply={onReply || (() => { })}
-                    reactions={[]}
-                    replyCount={0}
-                    isDirect={true}
+                    {...message}
+                // id={message.id}
+                // content={message.content}
+                // attachments={message.attachments}
+                // createdAt={message.created_at}
+                // user={{
+                //     id: message.sender.id,
+                //     fullName: message.sender.full_name,
+                //     avatarUrl: message.sender.avatar_url || undefined
+                // }}
+                // reactions={[]}
+                // replyCount={0}
+                // isDirect={true}
                 />
             ))}
             <div ref={messagesEndRef} />

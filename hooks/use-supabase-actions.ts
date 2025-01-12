@@ -1,9 +1,44 @@
 import { useCallback } from 'react'
-import { getSupabaseClient } from '../supabase/client'
-import { DBUser, Reaction } from '@/lib/types';
+import { getSupabaseClient } from '../lib/supabase/client'
+import { User, Reaction, Channel, MessageWithUser } from '@/lib/types/chat.types';
 
 export const useSupabase = () => {
     const supabase = getSupabaseClient();
+
+    const getPublicUser = useCallback(async (): Promise<User | null> => {
+        try {
+            const { data: { user }, error: authError } = await supabase.auth.getUser();
+            if (authError || !user) return null;
+
+            // Try to get existing user
+            const { data, error } = await supabase
+                .from('users')
+                .select('*')
+                .eq('id', user.id)
+                .single();
+
+            // If user doesn't exist, create one
+            if (error && error.code === 'PGRST116') {
+                const { data: newUser, error: insertError } = await supabase
+                    .from('users')
+                    .insert({
+                        id: user.id,
+                        username: user.user_metadata?.username || user.email?.split('@')[0],
+                    })
+                    .select()
+                    .single();
+
+                if (insertError) throw insertError;
+                return newUser;
+            }
+
+            if (error) throw error;
+            return data;
+        } catch (error) {
+            console.error('Error fetching user:', error);
+            return null;
+        }
+    }, [supabase]);
 
     // Channels
     const getChannels = useCallback(async () => {
@@ -13,16 +48,12 @@ export const useSupabase = () => {
                 .select(`
                     id,
                     name,
-                    description,
-                    is_private,
-                    created_by,
-                    created_at,
                     channel_members (user_id)
                 `)
                 .order('created_at', { ascending: true });
 
             if (error) throw error;
-            return data;
+            return data as unknown as Channel[];
         } catch (error) {
             console.error('Error fetching channels:', error);
             return [];
@@ -31,17 +62,14 @@ export const useSupabase = () => {
 
     const createChannel = useCallback(async (name: string, description: string) => {
         try {
-            const { data: user } = await supabase.auth.getUser();
-            if (!user.user) throw new Error('Not authenticated');
+            const user = await getPublicUser();
 
             // Create channel
             const { data: channel, error: insertError } = await supabase
                 .from('channels')
                 .insert({
                     name: name.toLowerCase().trim(),
-                    description,
-                    created_by: user.user.id,
-                    is_private: false
+                    created_at: new Date().toISOString()
                 })
                 .select()
                 .single();
@@ -53,7 +81,8 @@ export const useSupabase = () => {
                 .from('channel_members')
                 .insert({
                     channel_id: channel.id,
-                    user_id: user.user.id
+                    user_id: user?.id,
+                    joined_at: new Date().toISOString()
                 });
 
             if (memberError) throw memberError;
@@ -99,17 +128,33 @@ export const useSupabase = () => {
     }, [supabase]);
 
     // Messages
-    const getMessages = useCallback(async (channelId: string) => {
+    const getChannelMessages = useCallback(async (channelId: string): Promise<MessageWithUser[]> => {
         try {
             const { data, error } = await supabase
                 .from('messages')
-                .select(`*`)
+                .select(`
+                    id,
+                    content,
+                    created_at,
+                    channel_id,
+                    parent_id,
+                    attachments,
+                    user_id,
+                    user:users!inner (
+                        id,
+                        username,
+                        status
+                    )
+                `)
                 .eq('channel_id', channelId)
-                .order('created_at', { ascending: true })
+                .order('created_at', { ascending: true });
 
-            if (error) throw error;
+            if (error) {
+                console.error('Error fetching messages:', error);
+                throw error;
+            }
 
-            return data;
+            return data as MessageWithUser[];
         } catch (error) {
             console.error('Error fetching messages:', error);
             throw error;
@@ -140,34 +185,44 @@ export const useSupabase = () => {
         attachments?: any[]
     ) => {
         try {
-            const { data: { user }, error: authError } = await supabase.auth.getUser();
-            if (authError || !user) throw new Error('Not authenticated');
+            const user = await getPublicUser();
+            if (!user) throw new Error('User not found');
+
+            console.log('Sending message with user:', user); // Debug log
+
+            const messageData = {
+                channel_id: channelId,
+                content,
+                user_id: user.id,
+                parent_id: parentId,
+                attachments,
+                created_at: new Date().toISOString()
+            };
+
+            console.log('Message data to insert:', messageData); // Debug log
 
             const { data, error } = await supabase
                 .from('messages')
-                .insert({
-                    channel_id: channelId,
-                    content,
-                    user_id: user.id,
-                    parent_id: parentId,
-                    attachments,
-                    created_at: new Date().toISOString()
-                })
+                .insert(messageData)
                 .select()
                 .single();
 
-            if (error) throw error;
+            if (error) {
+                console.error('Database error:', error); // More detailed error logging
+                throw error;
+            }
+
+            console.log('Inserted message:', data); // Debug log
             return data;
         } catch (error) {
             console.error('Error sending message:', error);
             throw error;
         }
-    }, [supabase]);
+    }, [supabase, getPublicUser]);
 
     // Direct Messages
     const getDirectMessages = useCallback(async (userId: string) => {
-        const { data: user } = await supabase.auth.getUser();
-        if (!user.user) throw new Error('Not authenticated');
+        const user = await getPublicUser();
 
         const { data, error } = await supabase
             .from('direct_messages')
@@ -176,24 +231,23 @@ export const useSupabase = () => {
                 sender:sender_id(id, full_name, avatar_url),
                 receiver:receiver_id(id, full_name, avatar_url)
             `)
-            .or(`sender_id.eq.${user.user.id},receiver_id.eq.${user.user.id}`)
+            .or(`sender_id.eq.${user?.id},receiver_id.eq.${user?.id}`)
             .order('created_at', { ascending: true });
         if (error) throw error;
         return data;
-    }, [supabase]);
+    }, [supabase,]);
 
     const sendDirectMessage = useCallback(async (
         receiverId: string,
         content: string,
         attachments?: any[]
     ) => {
-        const { data: user } = await supabase.auth.getUser();
-        if (!user.user) throw new Error('Not authenticated');
+        const user = await getPublicUser();
 
         const { data, error } = await supabase
             .from('direct_messages')
             .insert({
-                sender_id: user.user.id,
+                sender_id: user?.id,
                 receiver_id: receiverId,
                 content,
                 attachments,
@@ -205,32 +259,23 @@ export const useSupabase = () => {
     }, [supabase]);
 
     // Reactions
-    const addReaction = async (messageId: string, emoji: string): Promise<Reaction> => {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) throw new Error('No user')
+    const addReaction = useCallback(async (messageId: string, emoji: string): Promise<Reaction> => {
+        const user = await getPublicUser();
 
         const { data, error } = await supabase
             .from('reactions')
             .insert({
                 message_id: messageId,
                 emoji,
-                user_id: user.id
+                user_id: user?.id
             })
-            .select('id, emoji')
+            .select('*')
             .single()
 
         if (error) throw error
 
-        // Ensure we return a properly typed reaction
-        return {
-            id: data.id,
-            emoji: data.emoji,
-            users: [{
-                id: user.id,
-                fullName: user.user_metadata.full_name || user.email // Fallback to email if name not available
-            }]
-        }
-    }
+        return data as Reaction
+    }, [supabase]);
 
     const removeReaction = useCallback(async (reactionId: string) => {
         const { error } = await supabase
@@ -242,69 +287,54 @@ export const useSupabase = () => {
 
     // Channel Members
     const joinChannel = useCallback(async (channelId: string) => {
-        const { data: user } = await supabase.auth.getUser();
-        if (!user.user) throw new Error('Not authenticated');
+        const user = await getPublicUser();
 
         const { error } = await supabase
             .from('channel_members')
             .insert({
                 channel_id: channelId,
-                user_id: user.user.id,
+                user_id: user?.id,
             });
         if (error) throw error;
     }, [supabase]);
 
     const leaveChannel = useCallback(async (channelId: string) => {
-        const { data: user } = await supabase.auth.getUser();
-        if (!user.user) throw new Error('Not authenticated');
+        const user = await getPublicUser();
 
         const { error } = await supabase
             .from('channel_members')
             .delete()
-            .match({ channel_id: channelId, user_id: user.user.id });
+            .match({ channel_id: channelId, user_id: user?.id });
         if (error) throw error;
     }, [supabase]);
 
     // Users
     const updateUserStatus = useCallback(async (status: 'online' | 'offline') => {
         try {
-            const { data: { user }, error: authError } = await supabase.auth.getUser()
-            if (authError || !user) throw new Error('Not authenticated')
+            const user = await getPublicUser();
 
             const { error } = await supabase
                 .from('users')
                 .update({
                     status,
-                    last_ping: status === 'online' ? new Date().toISOString() : null
                 })
-                .eq('id', user.id)
+                .eq('id', user?.id)
 
             if (error) throw error
         } catch (error) {
             console.error('Error updating status:', error)
             throw error
         }
-    }, [supabase])
-
-    const searchUsers = useCallback(async (query: string) => {
-        const { data, error } = await supabase
-            .from('users')
-            .select('id, full_name, avatar_url, status')
-            .ilike('full_name', `%${query}%`)
-            .limit(10);
-        if (error) throw error;
-        return data;
     }, [supabase]);
 
-    const getUsers = useCallback(async (): Promise<DBUser[]> => {
+    const getUsers = useCallback(async (): Promise<User[]> => {
         try {
-            const { data: { user } } = await supabase.auth.getUser()
-            if (!user) throw new Error('Not authenticated')
+            const user = await getPublicUser();
 
             const { data: users, error } = await supabase
                 .from('users')
                 .select('*')
-                .neq('id', user.id) // Don't include current user
+                .neq('id', user?.id) // Don't include current user
                 .order('email')
 
             if (error) {
@@ -312,109 +342,50 @@ export const useSupabase = () => {
                 throw error
             }
 
-            return users as DBUser[]
+            return users as User[]
         } catch (error) {
             console.error('Error fetching users:', error)
             throw error
         }
     }, [supabase])
 
-    interface SearchResult {
-        type: 'message' | 'channel' | 'user'
-        id: string
-        content?: string
-        channelId?: string
-        parentId?: string
-        userId?: string
-        title: string
-        subtitle: string
-        timestamp?: string
+    const uploadFile = async (file: File) => {
+        const supabase = getSupabaseClient()
+
+        // Create a unique file name
+        const fileExt = file.name.split('.').pop()
+        const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`
+        const filePath = `uploads/${fileName}`
+
+        const { data, error } = await supabase.storage
+            .from('attachments')
+            .upload(filePath, file)
+
+        if (error) throw error
+
+        // Get public URL
+        const { data: { publicUrl } } = supabase.storage
+            .from('attachments')
+            .getPublicUrl(filePath)
+
+        return {
+            file_name: file.name,
+            file_size: file.size,
+            file_type: file.type,
+            url: publicUrl
+        }
     }
 
-    const searchAll = useCallback(async (query: string): Promise<SearchResult[]> => {
-        if (!query.trim()) return []
 
-        try {
-            const [messagesRes, channelsRes, usersRes] = await Promise.all([
-                // Search messages using the custom function
-                supabase
-                    .rpc('search_messages', { search_query: query })
-                    .select(`
-                        id,
-                        content,
-                        channel_id,
-                        parent_id,
-                        created_at,
-                        user:user_id (id, email)
-                    `),
-
-                // Search channels
-                supabase
-                    .from('channels')
-                    .select('id, name, description')
-                    .textSearch('name', query, { type: 'plain' })
-                    .limit(5),
-
-                // Search users
-                supabase
-                    .from('users')
-                    .select('id, email, full_name')
-                    .textSearch('email', query, { type: 'plain' })
-                    .limit(5)
-            ])
-
-            const results: SearchResult[] = []
-
-            // Format message results
-            if (!messagesRes.error && messagesRes.data) {
-                results.push(...messagesRes.data.map(msg => ({
-                    type: 'message' as const,
-                    id: msg.id,
-                    content: msg.content,
-                    channelId: msg.channel_id,
-                    parentId: msg.parent_id,
-                    userId: msg.user?.[0]?.id || '',
-                    title: msg.content.substring(0, 50) + (msg.content.length > 50 ? '...' : ''),
-                    subtitle: `by ${msg.user?.[0]?.email || 'Unknown'}`,
-                    timestamp: msg.created_at
-                })))
-            }
-
-            // Format channel results
-            if (!channelsRes.error && channelsRes.data) {
-                results.push(...channelsRes.data.map(channel => ({
-                    type: 'channel' as const,
-                    id: channel.id,
-                    title: `#${channel.name}`,
-                    subtitle: channel.description || 'No description'
-                })))
-            }
-
-            // Format user results
-            if (!usersRes.error && usersRes.data) {
-                results.push(...usersRes.data.map(user => ({
-                    type: 'user' as const,
-                    id: user.id,
-                    title: user.full_name || user.email,
-                    subtitle: user.full_name ? user.email : 'Direct Message'
-                })))
-            }
-
-            return results
-        } catch (error) {
-            console.error('Search error:', error)
-            return []
-        }
-    }, [supabase])
 
     return {
-        supabase,
+        getPublicUser,
         // Channels
         getChannels,
         createChannel,
         deleteChannel,
         // Messages
-        getMessages,
+        getChannelMessages,
         getThreadMessages,
         sendMessage,
         // Direct Messages
@@ -428,8 +399,7 @@ export const useSupabase = () => {
         leaveChannel,
         // Users
         updateUserStatus,
-        searchUsers,
         getUsers,
-        searchAll,
+        uploadFile
     };
 }; 

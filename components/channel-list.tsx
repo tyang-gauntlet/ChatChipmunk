@@ -1,13 +1,13 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { Hash, Lock, Trash2 } from "lucide-react"
+import { Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { cn } from "@/lib/utils"
-import { useRouter, usePathname } from "next/navigation"
-import { useSupabase } from "@/lib/hooks/use-supabase-actions"
-import { Channel } from "@/lib/types"
+import { usePathname } from "next/navigation"
+import { useSupabase } from "@/hooks/use-supabase-actions"
+import { Channel } from "@/lib/types/chat.types"
 import {
     AlertDialog,
     AlertDialogAction,
@@ -18,17 +18,19 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import { getSupabaseClient } from "@/lib/supabase/client"
 
 interface ChannelListProps {
     onChannelSelect: (channel: Channel) => void;
 }
 
 export function ChannelList({ onChannelSelect }: ChannelListProps) {
-    const { getChannels, deleteChannel, supabase } = useSupabase()
+    const { getChannels, deleteChannel } = useSupabase()
     const [channels, setChannels] = useState<Channel[]>([])
     const [isLoading, setIsLoading] = useState(true)
     const pathname = usePathname()
     const [channelToDelete, setChannelToDelete] = useState<Channel | null>(null)
+    const supabase = getSupabaseClient()
 
     useEffect(() => {
         const fetchChannels = async () => {
@@ -53,7 +55,7 @@ export function ChannelList({ onChannelSelect }: ChannelListProps) {
                 event: '*',
                 schema: 'public',
                 table: 'channels'
-            }, (payload) => {
+            }, (payload: any) => {
                 if (payload.eventType === 'INSERT') {
                     setChannels(prev => [...prev, payload.new as Channel])
                 } else if (payload.eventType === 'DELETE') {
@@ -100,11 +102,6 @@ export function ChannelList({ onChannelSelect }: ChannelListProps) {
                             )}
                             onClick={() => onChannelSelect(channel)}
                         >
-                            {channel.is_private ? (
-                                <Lock className="mr-2 h-4 w-4" />
-                            ) : (
-                                <Hash className="mr-2 h-4 w-4" />
-                            )}
                             {channel.name}
                         </Button>
                         <Button

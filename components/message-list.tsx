@@ -1,76 +1,92 @@
 "use client"
 
 import { useEffect, useRef, useState } from 'react'
-import { Message as MessageComponent } from './message'
-import type { Message } from '@/lib/types'
-import { useSupabase } from '@/lib/hooks/use-supabase-actions'
+import Message from './message'
+import type { MessageWithUser } from '@/lib/types/chat.types'
+import { useSupabase } from '@/hooks/use-supabase-actions'
+import { getSupabaseClient } from '@/lib/supabase/client'
 
 interface MessageListProps {
     channelId?: string | null
     parentId?: string | null
     receiverId?: string | null
-    onReply: (messageId: string) => void
     highlightId?: string
 }
 
-export const MessageList = ({ channelId, parentId = null, receiverId = null, onReply, highlightId }: MessageListProps) => {
-    const { getMessages, getThreadMessages, getDirectMessages, supabase } = useSupabase()
+export const MessageList = ({ channelId, parentId, receiverId, highlightId }: MessageListProps) => {
+    const [messages, setMessages] = useState<MessageWithUser[]>([])
+    const { getChannelMessages } = useSupabase()
     const messagesEndRef = useRef<HTMLDivElement>(null)
-    const [messages, setMessages] = useState<Message[]>([])
-    const [isLoading, setIsLoading] = useState(true)
+    const containerRef = useRef<HTMLDivElement>(null)
+    const supabase = getSupabaseClient()
 
-    const scrollToBottom = () => {
-        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+    // Scroll to bottom with smooth animation
+    const scrollToBottom = (smooth = true) => {
+        if (containerRef.current) {
+            const { scrollHeight, clientHeight } = containerRef.current
+            containerRef.current.scrollTo({
+                top: scrollHeight - clientHeight,
+                behavior: smooth ? 'smooth' : 'auto'
+            })
+        }
+    }
+
+    // Check if scroll is near bottom
+    const isNearBottom = () => {
+        if (containerRef.current) {
+            const { scrollTop, scrollHeight, clientHeight } = containerRef.current
+            return scrollHeight - scrollTop - clientHeight < 100
+        }
+        return false
     }
 
     useEffect(() => {
         const fetchMessages = async () => {
             try {
-                setIsLoading(true)
-                let data: Message[] = []
-
-                if (channelId) {
-                    data = await getMessages(channelId)
-                } else if (parentId) {
-                    data = await getThreadMessages(parentId)
-                } else if (receiverId) {
-                    data = await getDirectMessages(receiverId)
-                }
-                setMessages(data)
-                scrollToBottom()
+                if (!channelId) return
+                const data = await getChannelMessages(channelId)
+                // Sort messages by created_at
+                const sortedMessages = [...data].sort((a, b) => {
+                    const dateA = a.created_at ? new Date(a.created_at).getTime() : 0;
+                    const dateB = b.created_at ? new Date(b.created_at).getTime() : 0;
+                    return dateA - dateB;
+                });
+                setMessages(sortedMessages)
+                scrollToBottom(false)
             } catch (error) {
                 console.error('Failed to fetch messages:', error)
-            } finally {
-                setIsLoading(false)
             }
         }
 
         fetchMessages()
-    }, [channelId, receiverId, parentId])
 
-    useEffect(() => {
-        const id = channelId || parentId;
-        if (!id) return;
-
+        // Subscribe to new messages
         const channel = supabase
-            .channel(`public:messages:${id}`)
+            .channel(`messages:${channelId}`)
             .on('postgres_changes', {
-                event: '*',
+                event: 'INSERT',
                 schema: 'public',
                 table: 'messages',
-                filter: channelId
-                    ? `channel_id=eq.${id}`
-                    : `parent_id=eq.${id}`
-            }, (payload) => {
-                if (payload.eventType === 'INSERT') {
-                    setMessages(prev => [...prev, payload.new as Message]);
-                    setTimeout(scrollToBottom, 100);
-                } else if (payload.eventType === 'DELETE') {
-                    setMessages(prev => prev.filter(msg => msg.id !== payload.old.id));
-                } else if (payload.eventType === 'UPDATE') {
-                    setMessages(prev => prev.map(msg =>
-                        msg.id === payload.new.id ? { ...msg, ...payload.new } : msg
-                    ));
+                filter: `channel_id=eq.${channelId}`
+            }, async (payload) => {
+                const { data: messageWithUser } = await supabase
+                    .from('messages')
+                    .select(`
+                        *,
+                        user:users!inner (
+                            id,
+                            username,
+                            status
+                        )
+                    `)
+                    .eq('id', payload.new.id)
+                    .single();
+
+                if (messageWithUser) {
+                    setMessages(prev => [...prev, messageWithUser as MessageWithUser])
+                    if (isNearBottom()) {
+                        scrollToBottom(true)
+                    }
                 }
             })
             .subscribe()
@@ -78,51 +94,21 @@ export const MessageList = ({ channelId, parentId = null, receiverId = null, onR
         return () => {
             supabase.removeChannel(channel)
         }
-    }, [channelId, parentId, supabase])
-
-    useEffect(() => {
-        if (highlightId) {
-            const element = document.getElementById(`message-${highlightId}`)
-            if (element) {
-                element.scrollIntoView({ behavior: 'smooth' })
-                element.classList.add('bg-accent')
-                setTimeout(() => element.classList.remove('bg-accent'), 2000)
-            }
-        }
-    }, [highlightId])
-
-    if (isLoading) {
-        return <div>Loading...</div>
-    }
+    }, [channelId, getChannelMessages])
 
     return (
-        <div className="flex-1 flex flex-col overflow-y-auto">
-            <div className="flex-1" />
+        <div
+            ref={containerRef}
+            className="flex-1 overflow-y-auto p-4 flex flex-col justify-end"
+        >
             {messages.map((message) => (
-                <MessageComponent
+                <Message
                     key={message.id}
-                    id={message.id}
-                    content={message.content}
-                    attachments={message.attachments || []}
-                    createdAt={message.created_at}
-                    user={{
-                        id: message.user?.id || '',
-                        fullName: message.user?.full_name || '',
-                        avatarUrl: message.user?.avatar_url || undefined
-                    }}
-                    reactions={message.reactions?.map(r => ({
-                        id: r.id,
-                        emoji: r.emoji,
-                        users: r.users.map(u => ({
-                            id: u.id,
-                            fullName: u.full_name
-                        }))
-                    }))}
-                    replyCount={message.threads?.length || 0}
-                    onReply={onReply}
+                    message={message}
+                    onReply={() => { }}
                 />
             ))}
-            <div ref={messagesEndRef} />
+            <div ref={messagesEndRef} className="h-1" />
         </div>
     )
 }

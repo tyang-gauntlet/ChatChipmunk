@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Label } from "@/components/ui/label"
-import { useAuth } from './actions'
+import { useAuth } from '../../hooks/use-auth'
 export default function LoginPage() {
     const { login, signup, isLoading } = useAuth()
     // DELETE ANY COOKIES STARTING WITH base64-
@@ -58,6 +58,16 @@ export default function LoginPage() {
                         </TabsContent>
                         <TabsContent value="signup">
                             <form onSubmit={signup} className="space-y-4">
+                                <div className="space-y-2">
+                                    <Label htmlFor="signup-username">Username</Label>
+                                    <Input
+                                        id="signup-username"
+                                        name="username"
+                                        type="text"
+                                        placeholder="johndoe"
+                                        required
+                                    />
+                                </div>
                                 <div className="space-y-2">
                                     <Label htmlFor="signup-email">Email</Label>
                                     <Input

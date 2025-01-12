@@ -1,8 +1,8 @@
+import { Metadata } from 'next'
+import ClientLayout from './client-layout'
 import "./globals.css"
-import { ThemeProvider } from "@/components/theme-provider"
-import { UserPresence } from '@/components/user-presence'
 
-export const metadata = {
+export const metadata: Metadata = {
   title: 'ChatChipmunk',
   description: 'Real-time chat application',
   metadataBase: new URL(
@@ -17,16 +17,8 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body>
-        <UserPresence />
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="system"
-          enableSystem
-          disableTransitionOnChange
-        >
-          {children}
-        </ThemeProvider>
+      <body suppressHydrationWarning>
+        <ClientLayout>{children}</ClientLayout>
       </body>
     </html>
   )

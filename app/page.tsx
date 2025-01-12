@@ -22,19 +22,15 @@ import { MessageInput } from '@/components/message-input'
 import { MessageList } from '@/components/message-list'
 import { Plus } from "lucide-react"
 import { CreateChannelDialog } from "@/components/create-channel-dialog"
-import { Channel, User } from "@/lib/types"
-import { useSupabase } from "@/lib/hooks/use-supabase-actions"
+import { useSupabase } from "@/hooks/use-supabase-actions"
 import { ThreadHeader } from "@/components/thread-header"
-import { Message } from "@/lib/types"
-import { User as SupabaseUser } from '@supabase/supabase-js'
-
-type DBUser = SupabaseUser
+import { User, Channel, Message } from '@/lib/types/chat.types'
 
 export default function Home() {
   const [open, setOpen] = useState(false)
   const [selectedThread, setSelectedThread] = useState<string | null>(null)
   const [currentChannel, setCurrentChannel] = useState<Channel | null>(null)
-  const [selectedUser, setSelectedUser] = useState<DBUser | null>(null)
+  const [selectedUser, setSelectedUser] = useState<User | null>(null)
   const [parentMessage, setParentMessage] = useState<Message | null>(null)
   const { getMessages } = useSupabase()
 
@@ -43,7 +39,7 @@ export default function Home() {
     setSelectedThread(null) // Reset thread when changing channels
   }
 
-  const handleUserSelect = (user: DBUser) => {
+  const handleUserSelect = (user: User) => {
     setSelectedUser(user)
     setCurrentChannel(null) // Reset channel when switching to DM
     setSelectedThread(null)
@@ -140,7 +136,7 @@ export default function Home() {
                     <h2 className="text-sm font-semibold ml-1.5">Direct Messages</h2>
                   </CollapsibleTrigger>
                   <CollapsibleContent className="mt-1">
-                    <DirectMessageList onUserSelect={(user: DBUser) => handleUserSelect(user)} />
+                    <DirectMessageList onUserSelect={(user: User) => handleUserSelect(user)} />
                   </CollapsibleContent>
                 </Collapsible>
               </div>

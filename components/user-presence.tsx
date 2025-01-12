@@ -1,40 +1,46 @@
 "use client"
 
-import { useEffect } from 'react'
-import { useSupabase } from '@/lib/hooks/use-supabase-actions'
+import { useEffect, useCallback } from 'react'
+import { useSupabase } from '@/hooks/use-supabase-actions'
 
 export const UserPresence = () => {
-    const { supabase } = useSupabase()
+    const { getPublicUser, updateUserStatus } = useSupabase()
+
+    const updateLastSeen = useCallback(async () => {
+        try {
+            const user = await getPublicUser()
+            if (!user) return
+            await updateUserStatus('online')
+        } catch (error) {
+            console.error('Failed to update last_seen:', error)
+        }
+    }, [getPublicUser, updateUserStatus])
 
     useEffect(() => {
-        let interval: NodeJS.Timeout
-
-        const updateLastSeen = async () => {
-            try {
-                const { data: { user } } = await supabase.auth.getUser()
-                if (!user) return
-
-                await supabase
-                    .from('users')
-                    .update({ last_seen: new Date().toISOString() })
-                    .eq('id', user.id)
-            } catch (error) {
-                console.error('Failed to update last_seen:', error)
-            }
-        }
-
-        // Update immediately
-        updateLastSeen()
-
-        // Update every 15 seconds when tab is visible
-        interval = setInterval(() => {
+        const interval = setInterval(() => {
             if (document.visibilityState === 'visible') {
                 updateLastSeen()
             }
         }, 15000)
 
+        // Initial update
+        updateLastSeen()
+
+        // Cleanup
         return () => clearInterval(interval)
-    }, [supabase])
+    }, [updateLastSeen])
+
+    // Handle visibility changes
+    useEffect(() => {
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === 'visible') {
+                updateLastSeen()
+            }
+        }
+
+        document.addEventListener('visibilitychange', handleVisibilityChange)
+        return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }, [updateLastSeen])
 
     return null
 } 

@@ -1,54 +1,34 @@
 "use client"
 
 import { useState, useEffect } from 'react'
-import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar'
+import { Avatar } from './ui/avatar'
 import { Button } from './ui/button'
 import { SmileIcon, MessageSquareIcon } from 'lucide-react'
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover'
 import data from '@emoji-mart/data'
 import Picker from '@emoji-mart/react'
 import { format } from 'date-fns'
-import { useSupabase } from '@/lib/hooks/use-supabase-actions'
+import { useSupabase } from '@/hooks/use-supabase-actions'
 import MessageAttachment from './message-attachment'
-
-interface Reaction {
-    id: string
-    emoji: string
-    users: { id: string; fullName: string }[]
-}
+import { getSupabaseClient } from '@/lib/supabase/client'
+import { Reaction } from '@/lib/types/chat.types'
+import type { Message as MessageType } from '@/lib/types/chat.types'
 
 interface MessageProps {
-    id: string
-    content: string
-    attachments: any[]
-    createdAt: string
-    user: {
-        id: string
-        fullName: string
-        avatarUrl?: string
-    }
-    reactions: Reaction[]
-    replyCount: number
-    onReply: (messageId: string) => void
-    isDirect?: boolean
+    message: MessageWithUser;
+    onReply: (messageId: string) => void;
 }
 
-export const Message = ({
-    id,
-    content,
-    attachments,
-    createdAt,
-    user,
-    reactions: initialReactions = [],
-    replyCount,
-    onReply,
-    isDirect,
-}: MessageProps) => {
-    const [showActions, setShowActions] = useState(false)
-    const [currentReactions, setCurrentReactions] = useState<Reaction[]>(initialReactions)
-    const { supabase, addReaction, removeReaction } = useSupabase()
+export default function Message({ message, onReply }: MessageProps) {
+    if (!message) return null;
+
+    const { id, content, created_at, attachments, user } = message;
+    const [showActions, setShowActions] = useState(false);
+    const [currentReactions, setCurrentReactions] = useState<Reaction[]>([]);
+    const { addReaction, removeReaction } = useSupabase();
 
     useEffect(() => {
+        const supabase = getSupabaseClient()
         const channel = supabase
             .channel(`public:reactions:${id}`)
             .on('postgres_changes', {
@@ -68,7 +48,7 @@ export const Message = ({
         return () => {
             supabase.removeChannel(channel)
         }
-    }, [id, supabase])
+    }, [id])
 
     const handleReaction = async (emoji: string) => {
         try {
@@ -95,71 +75,67 @@ export const Message = ({
         >
             <div className="relative">
                 <Avatar className="h-6 w-6">
-                    <AvatarImage src={user.avatarUrl} />
-                    <AvatarFallback className="text-xs">
-                        {(user.fullName || '?')[0]?.toUpperCase()}
-                    </AvatarFallback>
+                    <div className="flex h-full w-full items-center justify-center bg-primary text-primary-foreground text-xs">
+                        {user?.username?.[0]?.toUpperCase() || '?'}
+                    </div>
                 </Avatar>
             </div>
 
             <div className="flex-1 space-y-1">
                 <div className="flex items-center gap-2">
-                    <span className="font-semibold">{user.fullName}</span>
-                    <span className="text-xs text-muted-foreground">
-                        {format(new Date(createdAt), 'p')}
+                    <span className="font-semibold text-sm">{user?.username}</span>
+                    <span className="text-[10px] text-muted-foreground">
+                        {created_at ? format(new Date(created_at), 'p') : ''}
                     </span>
                 </div>
 
-                <div dangerouslySetInnerHTML={{ __html: content }} />
+                <div className="text-sm" dangerouslySetInnerHTML={{ __html: content }} />
 
-                {attachments?.length > 0 && (
+                {attachments && Array.isArray(attachments) && attachments.length > 0 && (
                     <div className="flex flex-col gap-2 mt-2">
-                        {attachments.map(attachment => (
+                        {attachments.map((attachment: any) => (
                             <MessageAttachment
-                                key={attachment.id}
+                                key={attachment?.id}
                                 attachment={attachment}
                             />
                         ))}
                     </div>
                 )}
 
-                {!isDirect && (
-                    <>
-                        {(currentReactions?.length > 0 || replyCount > 0) && (
-                            <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground mt-2">
-                                <div className="flex flex-wrap gap-1">
-                                    {currentReactions.map((reaction) => (
-                                        <div key={reaction.id} className="flex flex-col items-center">
-                                            <button
-                                                className="flex items-center gap-1 bg-accent rounded-full px-2 py-1 hover:bg-accent/80"
-                                                onClick={() => handleReaction(reaction.emoji)}
-                                            >
-                                                <span>{reaction.emoji}</span>
-                                            </button>
-                                            <span className="text-[10px] text-muted-foreground mt-0.5">
-                                                {reaction.users?.length || 0}
-                                            </span>
-                                        </div>
-                                    ))}
-                                </div>
-                                {replyCount > 0 && (
-                                    <div className="flex flex-col items-center">
-                                        <button
-                                            className="flex items-center gap-1 hover:text-foreground"
-                                            onClick={() => onReply(id)}
-                                        >
-                                            <MessageSquareIcon className="h-3 w-3" />
-                                            <span>{replyCount}</span>
-                                        </button>
-                                        <span className="text-[10px] text-muted-foreground mt-0.5">
-                                            {replyCount === 1 ? 'reply' : 'replies'}
-                                        </span>
-                                    </div>
-                                )}
+                {/* Reactions */}
+                {/* {currentReactions?.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mt-2">
+                        {currentReactions.map((reaction) => (
+                            <div key={reaction.id} className="flex flex-col items-center">
+                                <button
+                                    className="flex items-center gap-1 bg-accent rounded-full px-2 py-1 hover:bg-accent/80"
+                                    onClick={() => handleReaction(reaction.emoji)}
+                                >
+                                    <span>{reaction.emoji}</span>
+                                </button>
+                                <span className="text-[10px] text-muted-foreground mt-0.5">
+                                    {reaction.user_id?.length || 0}
+                                </span>
                             </div>
-                        )}
-                    </>
-                )}
+                        ))}
+                    </div>
+                )} */}
+
+                {/* Reply Count */}
+                {/* {replyCount > 0 && (
+                    <div className="flex items-center gap-1 text-xs text-muted-foreground mt-2">
+                        <button
+                            className="flex items-center gap-1 hover:text-foreground"
+                            onClick={() => onReply(id)}
+                        >
+                            <MessageSquareIcon className="h-3 w-3" />
+                            <span>{replyCount}</span>
+                            <span className="text-muted-foreground">
+                                {replyCount === 1 ? 'reply' : 'replies'}
+                            </span>
+                        </button>
+                    </div>
+                )} */}
             </div>
 
             {showActions && (
@@ -187,11 +163,6 @@ export const Message = ({
                         >
                             <MessageSquareIcon className="h-4 w-4" />
                         </Button>
-                        {replyCount > 0 && (
-                            <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[10px] text-primary-foreground">
-                                {replyCount > 99 ? '99+' : replyCount}
-                            </span>
-                        )}
                     </div>
                 </div>
             )}

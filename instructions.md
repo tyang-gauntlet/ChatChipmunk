@@ -1,6 +1,13 @@
 # AI Instructions
 
-We are building a slack clone. Please follow the outlined instructions below.
+We are building a slack clone. Please follow the outlined instructions below. Do not deviate from the instructions and do not make assumptions.
+
+## Coding rules to follow where applicable
+
+- KISS
+- SOLID
+- YAGNI
+- Stick with singleton supabase client in utils/supabase/client.tsx. When updating the database schema, update the lib/types/database.ts file and remind me to update the supabase/migrations folder.
 
 ## Tech Stack
 
@@ -44,104 +51,6 @@ The whole app is a single page app. No overflow. First screen is the sign in/sig
     - Channel/User message input - Messages are in rich text format utilizing quilljs but made to look like a shadcn/radix ui input. The message input is sticky and sits at the bottom of the main content. When pressing enter, the message is sent. When pressing shift+enter, a new line is created. There is also a separate input for threads.
     - Threads - use shadcn/radix ui for the threads. The thread of a selected message are displayed in a right closeable sidebar. The most recent message of the thread is at the bottom of the list. And the thread is displayed in a scrollable container starting from the bottom. The selected message is on the top of the thread.
 
-### File structure 
-
-This is only a skeleton and is subject to change. 
-
-chatchipmunk/
-├── public/
-├── app/
-│   ├── auth/
-│   │   └── page.tsx
-│   ├── channels/
-│   │   └── page.tsx
-│   ├── dm/
-│   │   └── page.tsx
-│   ├── layout.tsx
-│   └── page.tsx
-├── components/
-│   ├── ui/
-│   ├── emoji-picker.tsx
-│   ├── message-input.tsx
-│   ├── message-list.tsx
-│   ├── message.tsx
-│   ├── thread.tsx
-│   └── toolbar.tsx
-├── lib/
-├── utils/
-├── hooks/
-└── middleware.ts
-
 ## Database Schema
 
-```mermaid
-erDiagram
-    users {
-        uuid id PK
-        string email
-        string full_name
-        string avatar_url
-        timestamp last_seen
-        string status
-        timestamp created_at
-    }
-    
-    channels {
-        uuid id PK
-        string name
-        string description
-        boolean is_private
-        uuid created_by FK
-        timestamp created_at
-    }
-    
-    messages {
-        uuid id PK
-        uuid channel_id FK
-        uuid user_id FK
-        text content
-        jsonb attachments
-        uuid parent_id FK "For threads"
-        timestamp created_at
-        timestamp updated_at
-    }
-    
-    reactions {
-        uuid id PK
-        uuid message_id FK
-        uuid user_id FK
-        string emoji
-        timestamp created_at
-    }
-    
-    channel_members {
-        uuid channel_id FK
-        uuid user_id FK
-        timestamp joined_at
-    }
-    
-    direct_messages {
-        uuid id PK
-        uuid sender_id FK
-        uuid receiver_id FK
-        text content
-        jsonb attachments
-        timestamp created_at
-        timestamp updated_at
-    }
-
-    users ||--o{ channels : "creates"
-    users ||--o{ messages : "sends"
-    users ||--o{ reactions : "reacts"
-    users ||--o{ channel_members : "joins"
-    users ||--o{ direct_messages : "sends/receives"
-    
-    channels ||--o{ messages : "contains"
-    channels ||--o{ channel_members : "has"
-    
-    messages ||--o{ reactions : "has"
-    messages ||--o{ messages : "has threads"
-```
-
-
-
+Can be found in the supabase/migrations folder.

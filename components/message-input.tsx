@@ -1,20 +1,22 @@
 "use client"
 
 import { useState, useRef } from 'react'
-import { uploadFile } from '@/lib/utils/upload'
+import { useSupabase } from '@/hooks/use-supabase-actions'
 import { getSupabaseClient } from '@/lib/supabase/client'
 
 interface MessageInputProps {
-    channelId: string
+    channelId?: string
     parentId?: string
+    receiver_id?: string
 }
 
-export const MessageInput = ({ channelId, parentId }: MessageInputProps) => {
+export const MessageInput = ({ channelId, parentId, receiver_id }: MessageInputProps) => {
     const [content, setContent] = useState('')
     const [isUploading, setIsUploading] = useState(false)
     const [selectedFiles, setSelectedFiles] = useState<File[]>([])
     const fileInputRef = useRef<HTMLInputElement>(null)
     const supabase = getSupabaseClient()
+    const { uploadFile, getPublicUser } = useSupabase()
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const files = e.target.files
@@ -36,12 +38,16 @@ export const MessageInput = ({ channelId, parentId }: MessageInputProps) => {
                 attachments = await Promise.all(selectedFiles.map(uploadFile))
             }
 
+            const user = await getPublicUser()
+            if (!user) throw new Error('User not found')
+
             // Create message with attachments
             const { error } = await supabase
                 .from('messages')
                 .insert({
+                    user_id: user.id,
                     content: content.trim(),
-                    channel_id: channelId,
+                    channel_id: channelId || null,
                     parent_id: parentId || null,
                     attachments: attachments
                 })

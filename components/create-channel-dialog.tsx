@@ -11,10 +11,8 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
-import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
-import { useSupabase } from '@/lib/hooks/use-supabase-actions';
+import { useSupabase } from '@/hooks/use-supabase-actions';
 
 interface CreateChannelDialogProps {
     children: React.ReactNode;

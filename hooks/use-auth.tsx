@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { getSupabaseClient } from '@/lib/supabase/client'
 
@@ -8,6 +8,12 @@ export const useAuth = () => {
     const [isLoading, setIsLoading] = useState(false)
     const router = useRouter()
     const supabase = getSupabaseClient()
+
+    const getUser = useCallback(async () => {
+        const { data: { user }, error } = await supabase.auth.getUser();
+        if (error || !user) throw new Error('Not authenticated');
+        return user;
+    }, [supabase]);
 
     const login = async (event: React.FormEvent<HTMLFormElement>) => {
         event.preventDefault()
@@ -36,12 +42,23 @@ export const useAuth = () => {
         try {
             setIsLoading(true)
             const formData = new FormData(event.currentTarget)
-            const { error } = await supabase.auth.signUp({
+            const { data: { user }, error } = await supabase.auth.signUp({
                 email: formData.get('email') as string,
                 password: formData.get('password') as string,
+                options: {
+                    data: {
+                        username: formData.get('username') as string
+                    }
+                }
             })
 
             if (error) throw error
+
+            // if (user) {
+            //     await supabase.from('users').update({
+            //         username: formData.get('username') as string
+            //     }).eq('id', user.id)
+            // }
 
             router.refresh()
             router.push('/')
@@ -53,9 +70,15 @@ export const useAuth = () => {
         }
     }
 
+    const signOut = async () => {
+        await supabase.auth.signOut()
+    }
+
     return {
         login,
         signup,
-        isLoading
+        isLoading,
+        getUser,
+        signOut
     }
 }
