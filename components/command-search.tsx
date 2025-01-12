@@ -45,19 +45,19 @@ export function CommandSearch({ open, onOpenChange, onSelect }: CommandSearchPro
 
                 const results: SearchResult[] = [
                     ...channels.map((channel: Channel) => ({
-                        type: 'channel',
+                        type: 'channel' as const,
                         id: channel.id,
                         title: channel.name,
                     })),
                     ...messages.map((message: MessageWithUser) => ({
-                        type: 'message',
+                        type: 'message' as const,
                         id: message.id,
                         title: message.content,
                         subtitle: `by ${message?.user?.username}`,
                         timestamp: format(new Date(message.created_at || ''), 'MMM d, yyyy')
                     })),
                     ...users.map((user: User) => ({
-                        type: 'user',
+                        type: 'user' as const,
                         id: user.id,
                         title: user.username,
                         subtitle: `Status: ${user.status || 'offline'}`

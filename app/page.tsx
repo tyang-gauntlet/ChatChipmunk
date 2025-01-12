@@ -27,6 +27,7 @@ import { ThreadHeader } from "@/components/thread-header"
 import { User, Channel, MessageWithUser } from '@/lib/types/chat.types'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { CommandSearch } from '@/components/command-search'
+import { Suspense } from 'react'
 
 interface MessageTarget {
   channelId?: string;
@@ -34,7 +35,7 @@ interface MessageTarget {
   parentId?: string;
 }
 
-export default function Home() {
+function HomeContent() {
   const params = useParams();
   const router = useRouter();
   const searchParams = useSearchParams()
@@ -43,7 +44,7 @@ export default function Home() {
   const [currentChannel, setCurrentChannel] = useState<Channel | null>(null)
   const [selectedUser, setSelectedUser] = useState<User | null>(null)
   const [parentMessage, setParentMessage] = useState<MessageWithUser | null>(null)
-  const { getChannelMessages, getDirectMessages, getChannel, getUser, getMessage, getDMContext } = useSupabase()
+  const { getChannelMessages, getDirectMessages, getChannel, getUser, getMessage, getDMContext, getPublicUser } = useSupabase()
 
   // Add URL state management
   const updateUrl = (params: { channelId?: string; userId?: string; messageId?: string }) => {
@@ -221,11 +222,17 @@ export default function Home() {
             } else {
               const dmContext = await getDMContext(message.id);
               if (dmContext) {
-                const otherUserId = dmContext.sender_id === message.user_id
-                  ? dmContext.receiver_id
-                  : dmContext.sender_id;
-                const user = await getUser(otherUserId);
-                if (user) handleUserSelect(user);
+                // Get the current user
+                const currentUser = await getPublicUser();
+                if (currentUser) {
+                  // Get the other user in the conversation
+                  const otherUserId = dmContext.sender_id === currentUser.id
+                    ? dmContext.receiver_id
+                    : dmContext.sender_id;
+
+                  const otherUser = await getUser(otherUserId);
+                  if (otherUser) handleUserSelect(otherUser);
+                }
               }
             }
 
@@ -383,6 +390,18 @@ export default function Home() {
         </main>
       </div>
     </div>
+  )
+}
+
+export default function Home() {
+  return (
+    <Suspense fallback={
+      <div className="flex h-screen items-center justify-center">
+        <div className="animate-pulse">Loading...</div>
+      </div>
+    }>
+      <HomeContent />
+    </Suspense>
   )
 }
 
