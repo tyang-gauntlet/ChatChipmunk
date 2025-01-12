@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, Suspense } from 'react'
 import { useSupabase } from '@/hooks/use-supabase-actions'
 import { getSupabaseClient } from '@/lib/supabase/client'
 import { User } from '@/lib/types/chat.types'
@@ -12,7 +12,7 @@ interface DirectMessageListProps {
     onUserSelect: (user: User) => void;
 }
 
-export const DirectMessageList = ({ onUserSelect }: DirectMessageListProps) => {
+const DirectMessageListContent = ({ onUserSelect }: DirectMessageListProps) => {
     const { getUsers } = useSupabase();
     const [users, setUsers] = useState<User[]>([]);
     const searchParams = useSearchParams();
@@ -79,4 +79,12 @@ export const DirectMessageList = ({ onUserSelect }: DirectMessageListProps) => {
             ))}
         </div>
     );
-}; 
+};
+
+export const DirectMessageList = (props: DirectMessageListProps) => {
+    return (
+        <Suspense fallback={<div className="px-4 py-2">Loading users...</div>}>
+            <DirectMessageListContent {...props} />
+        </Suspense>
+    )
+} 

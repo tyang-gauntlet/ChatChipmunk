@@ -17,7 +17,7 @@ import {
   CommandList,
 } from "@/components/ui/command"
 import { Search } from "lucide-react"
-import { useState, useEffect } from "react"
+import { useState, useEffect, Suspense } from "react"
 import { MessageInput } from '@/components/message-input'
 import { MessageList } from '@/components/message-list'
 import { Plus } from "lucide-react"
@@ -34,7 +34,8 @@ interface MessageTarget {
   parentId?: string;
 }
 
-export default function Home() {
+// Create a wrapped version of the main content
+const ChatContent = () => {
   const router = useRouter()
   const searchParams = useSearchParams()
 
@@ -317,6 +318,19 @@ export default function Home() {
         </main>
       </div>
     </div>
+  )
+}
+
+// Update the default export to use Suspense
+export default function Home() {
+  return (
+    <Suspense fallback={
+      <div className="flex flex-col h-screen w-full items-center justify-center">
+        <div className="animate-pulse">Loading...</div>
+      </div>
+    }>
+      <ChatContent />
+    </Suspense>
   )
 }
 

@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, Suspense } from "react"
 import { Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -24,7 +24,7 @@ interface ChannelListProps {
     onChannelSelect: (channel: Channel) => void;
 }
 
-export function ChannelList({ onChannelSelect }: ChannelListProps) {
+const ChannelListContent = ({ onChannelSelect }: ChannelListProps) => {
     const { getChannels, deleteChannel } = useSupabase()
     const [channels, setChannels] = useState<Channel[]>([])
     const [isLoading, setIsLoading] = useState(true)
@@ -144,5 +144,13 @@ export function ChannelList({ onChannelSelect }: ChannelListProps) {
                 </AlertDialogContent>
             </AlertDialog>
         </>
+    )
+}
+
+export function ChannelList(props: ChannelListProps) {
+    return (
+        <Suspense fallback={<div className="p-4">Loading channels...</div>}>
+            <ChannelListContent {...props} />
+        </Suspense>
     )
 } 

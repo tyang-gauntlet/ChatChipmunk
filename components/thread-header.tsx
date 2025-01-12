@@ -2,7 +2,7 @@
 
 import { MessageSquare, X } from "lucide-react"
 import { Button } from "./ui/button"
-import { Message } from "@/lib/types"
+import { Message } from "@/lib/types/chat.types"
 
 interface ThreadHeaderProps {
     onClose: () => void
