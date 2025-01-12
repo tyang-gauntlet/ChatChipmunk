@@ -193,7 +193,18 @@ export default function Home() {
                   receiverId={selectedUser?.id}
                   onReply={handleThreadSelect}
                 />
-                <MessageInput {...getMessageTarget()} />
+                <MessageInput
+                  {...getMessageTarget()}
+                  onMessageSent={() => {
+                    const messageList = document.querySelector('.message-list');
+                    if (messageList) {
+                      messageList.scrollTo({
+                        top: messageList.scrollHeight,
+                        behavior: 'smooth'
+                      });
+                    }
+                  }}
+                />
               </div>
 
               {selectedThread && (

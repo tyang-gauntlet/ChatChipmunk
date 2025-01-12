@@ -8,9 +8,10 @@ interface MessageInputProps {
     channelId?: string
     parentId?: string
     receiverId?: string
+    onMessageSent?: () => void
 }
 
-export const MessageInput = ({ channelId, parentId, receiverId }: MessageInputProps) => {
+export const MessageInput = ({ channelId, parentId, receiverId, onMessageSent }: MessageInputProps) => {
     const [content, setContent] = useState('')
     const [isUploading, setIsUploading] = useState(false)
     const [selectedFiles, setSelectedFiles] = useState<File[]>([])
@@ -47,6 +48,9 @@ export const MessageInput = ({ channelId, parentId, receiverId }: MessageInputPr
             setContent('')
             setSelectedFiles([])
             if (fileInputRef.current) fileInputRef.current.value = ''
+
+            // Call the callback after message is sent
+            onMessageSent?.()
         } catch (error) {
             console.error('Error sending message:', error)
         } finally {
@@ -55,14 +59,14 @@ export const MessageInput = ({ channelId, parentId, receiverId }: MessageInputPr
     }
 
     return (
-        <form onSubmit={handleSubmit} className="flex flex-col gap-2 p-4">
+        <form onSubmit={handleSubmit} className="flex flex-col gap-2 p-4 bg-background border-t">
             <div className="flex items-center gap-2">
                 <input
                     type="text"
                     value={content}
                     onChange={e => setContent(e.target.value)}
                     placeholder="Type a message..."
-                    className="flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                    className="flex-1 rounded-md border border-input bg-background px-4 py-3 text-base ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                     disabled={isUploading}
                 />
                 <input

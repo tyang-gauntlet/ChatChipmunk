@@ -12,9 +12,10 @@ interface MessageListProps {
     receiverId?: string | null
     highlightId?: string
     onReply?: (id: string) => void
+    className?: string
 }
 
-export const MessageList = ({ channelId, receiverId, parentId, onReply }: MessageListProps) => {
+export const MessageList = ({ channelId, receiverId, parentId, onReply, className }: MessageListProps) => {
     const [messages, setMessages] = useState<MessageWithUser[]>([])
     const { getChannelMessages, getDirectMessages, subscribeToDirectMessages } = useSupabase()
     const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -68,7 +69,8 @@ export const MessageList = ({ channelId, receiverId, parentId, onReply }: Messag
                     fetchedMessages = messages.filter(m => !m.parent_id);
                 }
                 setMessages(fetchedMessages);
-                scrollToBottom();
+                // Use setTimeout to ensure DOM has updated
+                setTimeout(() => scrollToBottom(false), 100);
             } catch (error) {
                 console.error('Error loading messages:', error);
             }
@@ -112,11 +114,16 @@ export const MessageList = ({ channelId, receiverId, parentId, onReply }: Messag
             };
         } else if (receiverId) {
             // DM subscription
-            const unsubscribe = subscribeToDirectMessages(receiverId, (newMessage) => {
+            let cleanup: (() => void) | undefined;
+            subscribeToDirectMessages(receiverId, (newMessage) => {
                 setMessages(prev => [...prev, newMessage]);
-                scrollToBottom();
+            }).then(unsubscribe => {
+                cleanup = unsubscribe;
             });
-            return () => unsubscribe?.();
+
+            return () => {
+                cleanup?.();
+            };
         } else if (channelId) {
             // Channel subscription
             const channel = supabase
@@ -155,11 +162,19 @@ export const MessageList = ({ channelId, receiverId, parentId, onReply }: Messag
         }
     }, [channelId, receiverId, parentId]);
 
+    // Add this useEffect to handle message changes
+    useEffect(() => {
+        if (messages.length > 0) {
+            // Small delay to ensure attachments are loaded
+            setTimeout(() => scrollToBottom(true), 100);
+        }
+    }, [messages]);
+
     return (
         <div
             ref={containerRef}
-            className="flex-1 overflow-y-auto p-4 flex flex-col min-h-0"
-            style={{ maxHeight: 'calc(100vh - 180px)' }}
+            className={`message-list flex-1 overflow-y-auto p-4 flex flex-col min-h-0 ${className || ''}`}
+            style={{ maxHeight: 'calc(100vh - 200px)' }}
         >
             <div className="flex-1" />
             {messages.map((message) => (
@@ -169,7 +184,7 @@ export const MessageList = ({ channelId, receiverId, parentId, onReply }: Messag
                     onReply={onReply || (() => { })}
                 />
             ))}
-            <div ref={messagesEndRef} className="h-1" />
+            <div ref={messagesEndRef} />
         </div>
     )
 }

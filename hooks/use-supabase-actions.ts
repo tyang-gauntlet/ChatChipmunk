@@ -423,23 +423,30 @@ export const useSupabase = () => {
         }
     }
 
-    const subscribeToDirectMessages = useCallback((receiverId: string, callback: (message: MessageWithUser) => void) => {
-        const user = getPublicUser();
-        if (!user) return;
+    const subscribeToDirectMessages = useCallback(async (receiverId: string, callback: (message: MessageWithUser) => void) => {
+        console.log('Starting DM subscription for receiver:', receiverId);
+
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+            console.error('No authenticated user found');
+            return;
+        }
+        console.log('Current user:', user.id);
 
         const channel = supabase
-            .channel('direct_messages')
+            .channel(`direct_messages:${user.id}:${receiverId}`)
             .on(
                 'postgres_changes',
                 {
                     event: 'INSERT',
                     schema: 'public',
                     table: 'direct_messages',
-                    filter: `sender_id=in.(${user.id},${receiverId})&receiver_id=in.(${user.id},${receiverId})`
+                    filter: `sender_id=in.(${user.id},${receiverId})`
                 },
                 async (payload) => {
-                    // Fetch the complete message with user data
-                    const { data: message } = await supabase
+                    console.log('Received DM payload:', payload);
+
+                    const { data: message, error } = await supabase
                         .from('messages')
                         .select(`
                             *,
@@ -452,14 +459,23 @@ export const useSupabase = () => {
                         .eq('id', payload.new.id)
                         .single();
 
+                    if (error) {
+                        console.error('Error fetching DM message:', error);
+                        return;
+                    }
+
                     if (message) {
+                        console.log('Processing DM message:', message);
                         callback(message as MessageWithUser);
                     }
                 }
             )
             .subscribe();
 
+        console.log('DM subscription channel created:', channel.state);
+
         return () => {
+            console.log('Cleaning up DM subscription');
             supabase.removeChannel(channel);
         };
     }, [supabase]);
