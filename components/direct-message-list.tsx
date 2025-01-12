@@ -1,91 +1,100 @@
 "use client"
 
-import { useEffect, useRef, useState } from 'react'
-import Message from './message'
+import { useEffect, useState } from 'react'
 import { useSupabase } from '@/hooks/use-supabase-actions'
 import { getSupabaseClient } from '@/lib/supabase/client'
-import type { Message as MessageType } from '@/lib/types/chat.types'
+import { User } from '@/lib/types/chat.types'
+import { Button } from './ui/button'
+import { cn } from '@/lib/utils'
+import { usePathname } from 'next/navigation'
 
 interface DirectMessageListProps {
-    userId?: string;
+    onUserSelect: (user: User) => void;
 }
 
-export const DirectMessageList = ({ userId }: DirectMessageListProps) => {
-    const { getDirectMessages } = useSupabase()
-    const messagesEndRef = useRef<HTMLDivElement>(null)
-    const [messages, setMessages] = useState<MessageType[]>([])
+export const DirectMessageList = ({ onUserSelect }: DirectMessageListProps) => {
+    const [users, setUsers] = useState<User[]>([])
     const [isLoading, setIsLoading] = useState(true)
+    const { getUsers } = useSupabase()
     const supabase = getSupabaseClient()
-
-    const scrollToBottom = () => {
-        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
-    }
+    const pathname = usePathname()
 
     useEffect(() => {
-        const fetchMessages = async () => {
+        const fetchUsers = async () => {
             try {
                 setIsLoading(true)
-                if (!userId) return
-                const data = await getDirectMessages(userId)
-                setMessages(data)
-                scrollToBottom()
+                const data = await getUsers()
+                setUsers(data)
             } catch (error) {
-                console.error('Failed to fetch messages:', error)
+                console.error('Failed to fetch users:', error)
             } finally {
                 setIsLoading(false)
             }
         }
 
-        fetchMessages()
-    }, [userId])
+        fetchUsers()
 
-    useEffect(() => {
-        const channel = supabase
-            .channel(`direct_messages:${userId}`)
+        // Subscribe to user changes
+        const userChannel = supabase
+            .channel('public:users')
             .on('postgres_changes', {
                 event: '*',
                 schema: 'public',
-                table: 'direct_messages',
-                filter: `sender_id=eq.${userId}`
-            }, (payload) => {
+                table: 'users'
+            }, async (payload) => {
                 if (payload.eventType === 'INSERT') {
-                    setMessages(prev => [...prev, payload.new as MessageType])
-                    setTimeout(scrollToBottom, 100)
+                    const { data: newUser } = await supabase
+                        .from('users')
+                        .select('*')
+                        .eq('id', payload.new.id)
+                        .single();
+
+                    if (newUser) {
+                        setUsers(prev => [...prev, newUser as User]);
+                    }
+                } else if (payload.eventType === 'UPDATE') {
+                    setUsers(prev => prev.map(user =>
+                        user.id === payload.new.id
+                            ? { ...user, ...payload.new }
+                            : user
+                    ));
+                } else if (payload.eventType === 'DELETE') {
+                    setUsers(prev => prev.filter(user => user.id !== payload.old.id));
                 }
             })
             .subscribe()
 
         return () => {
-            supabase.removeChannel(channel)
+            supabase.removeChannel(userChannel)
         }
-    }, [userId, supabase])
+    }, [getUsers])
 
     if (isLoading) {
-        return <div>Loading...</div>
+        return <div className="px-4 py-2">Loading users...</div>
     }
 
     return (
-        <div className="flex-1 flex flex-col overflow-y-auto">
-            <div className="flex-1" />
-            {messages.map((message) => (
-                <Message
-                    key={message.id}
-                    {...message}
-                // id={message.id}
-                // content={message.content}
-                // attachments={message.attachments}
-                // createdAt={message.created_at}
-                // user={{
-                //     id: message.sender.id,
-                //     fullName: message.sender.full_name,
-                //     avatarUrl: message.sender.avatar_url || undefined
-                // }}
-                // reactions={[]}
-                // replyCount={0}
-                // isDirect={true}
-                />
+        <div className="space-y-1">
+            {users.map((user) => (
+                <Button
+                    key={user.id}
+                    variant="ghost"
+                    size="sm"
+                    className={cn(
+                        "w-full justify-start font-normal relative pl-8",
+                        pathname === `/dm/${user.id}` && "bg-accent"
+                    )}
+                    onClick={() => onUserSelect(user)}
+                >
+                    <span
+                        className={cn(
+                            "absolute left-2 top-1/2 -translate-y-1/2 w-2 h-2 rounded-full",
+                            user.status === 'online' ? 'bg-green-500' : 'bg-muted'
+                        )}
+                    />
+                    <span className="truncate">{user.username}</span>
+                </Button>
             ))}
-            <div ref={messagesEndRef} />
         </div>
     )
 } 

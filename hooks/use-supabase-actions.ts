@@ -332,7 +332,6 @@ export const useSupabase = () => {
                 .from('users')
                 .select('*')
                 .neq('id', user?.id) // Don't include current user
-                .order('email')
 
             if (error) {
                 console.error('Error fetching users:', error)

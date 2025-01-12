@@ -16,7 +16,7 @@ export function UserNav() {
     const [userInitial, setUserInitial] = useState("")
     const router = useRouter()
     const { signOut } = useAuth()
-    const { getPublicUser } = useSupabase()
+    const { getPublicUser, updateUserStatus } = useSupabase()
 
     useEffect(() => {
         const getUsername = async () => {
@@ -28,9 +28,14 @@ export function UserNav() {
         getUsername()
     }, [])
 
-    const handleSignOut = async () => {
-        await signOut()
-        router.push("/login")
+    const handleLogout = async () => {
+        try {
+            await updateUserStatus('offline')
+            await signOut()
+            router.push('/login')
+        } catch (error) {
+            console.error('Error during logout:', error)
+        }
     }
 
     return (
@@ -41,7 +46,7 @@ export function UserNav() {
                 </Avatar>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="bg-background">
-                <DropdownMenuItem onClick={handleSignOut} className="bg-background hover:bg-accent">
+                <DropdownMenuItem onClick={handleLogout} className="bg-background hover:bg-accent">
                     Sign out
                 </DropdownMenuItem>
             </DropdownMenuContent>
