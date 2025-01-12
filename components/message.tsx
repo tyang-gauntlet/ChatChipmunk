@@ -152,6 +152,7 @@ export default function Message({ message, onReply }: MessageProps) {
 
     return (
         <div
+            id={`message-${id}`}
             className="group flex gap-3 py-2 px-4 hover:bg-accent/50 relative"
             onMouseEnter={() => setShowActions(true)}
             onMouseLeave={() => setShowActions(false)}

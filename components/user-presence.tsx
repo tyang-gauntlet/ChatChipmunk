@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useCallback } from 'react'
-import { useSupabase } from '@/hooks/use-supabase-actions'
+import { useSupabase } from '../hooks/use-supabase-actions'
 
 export const UserPresence = () => {
     const { getPublicUser, updateUserStatus } = useSupabase()

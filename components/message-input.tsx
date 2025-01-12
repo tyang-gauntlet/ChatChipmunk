@@ -2,7 +2,6 @@
 
 import { useState, useRef } from 'react'
 import { useSupabase } from '@/hooks/use-supabase-actions'
-import { getSupabaseClient } from '@/lib/supabase/client'
 
 interface MessageInputProps {
     channelId?: string

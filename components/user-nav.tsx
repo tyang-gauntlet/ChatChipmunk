@@ -22,7 +22,7 @@ export function UserNav() {
         const getUsername = async () => {
             const user = await getPublicUser()
             if (user?.username) {
-                setUserInitial(user.username.toUpperCase())
+                setUserInitial(user.username.toUpperCase()[0])
             }
         }
         getUsername()

@@ -442,7 +442,6 @@ export const useSupabase = () => {
                     filter: `user_id=in.(${user.id},${receiverId}) and parent_id=is.null`
                 },
                 async (payload) => {
-                    console.log('Received DM payload:', payload);
 
                     const { data: message, error } = await supabase
                         .from('messages')
@@ -464,7 +463,6 @@ export const useSupabase = () => {
 
                     // Only process messages that are not thread replies
                     if (message && !message.parent_id) {
-                        console.log('Processing DM message:', message);
                         callback(message as MessageWithUser);
                     }
                 }
@@ -472,9 +470,152 @@ export const useSupabase = () => {
             .subscribe();
 
         return () => {
-            console.log('Cleaning up DM subscription');
             supabase.removeChannel(channel);
         };
+    }, [supabase]);
+
+    const getChannel = useCallback(async (channelId: string) => {
+        const { data } = await supabase
+            .from('channels')
+            .select('*')
+            .eq('id', channelId)
+            .single();
+        return data;
+    }, [supabase]);
+
+    const getUser = useCallback(async (userId: string) => {
+        const { data } = await supabase
+            .from('users')
+            .select('*')
+            .eq('id', userId)
+            .single();
+        return data;
+    }, [supabase]);
+
+    const getMessage = useCallback(async (messageId: string) => {
+        const { data } = await supabase
+            .from('messages')
+            .select('*')
+            .eq('id', messageId)
+            .single();
+        return data;
+    }, [supabase]);
+
+    const getDMContext = useCallback(async (messageId: string) => {
+        const { data } = await supabase
+            .from('direct_messages')
+            .select('*')
+            .eq('id', messageId)
+            .single();
+        return data;
+    }, [supabase]);
+
+    const searchMessages = useCallback(async (query: string): Promise<MessageWithUser[]> => {
+        console.log('Searching messages for:', query);
+
+        try {
+            const user = await getPublicUser();
+            if (!user) throw new Error('No user found');
+
+            // First get channel messages
+            const { data: channelMessages, error: channelError } = await supabase
+                .from('messages')
+                .select(`
+                    *,
+                    user:users!inner (
+                        id,
+                        username,
+                        status
+                    )
+                `)
+                .ilike('content', `%${query}%`)
+                .not('channel_id', 'is', null)
+                .limit(5);
+
+            // Then get DM messages using a simpler query
+            const { data: dmMessages, error: dmError } = await supabase
+                .from('messages')
+                .select(`
+                    *,
+                    user:users!inner (
+                        id,
+                        username,
+                        status
+                    ),
+                    direct_messages!inner (
+                        sender_id,
+                        receiver_id
+                    )
+                `)
+                .ilike('content', `%${query}%`)
+                .is('channel_id', null)
+                .in('direct_messages.sender_id', [user.id])
+                .limit(5);
+
+            // Get DM messages where user is receiver
+            const { data: receivedDMs, error: receivedError } = await supabase
+                .from('messages')
+                .select(`
+                    *,
+                    user:users!inner (
+                        id,
+                        username,
+                        status
+                    ),
+                    direct_messages!inner (
+                        sender_id,
+                        receiver_id
+                    )
+                `)
+                .ilike('content', `%${query}%`)
+                .is('channel_id', null)
+                .in('direct_messages.receiver_id', [user.id])
+                .limit(5);
+
+            if (channelError) throw channelError;
+            if (dmError) throw dmError;
+            if (receivedError) throw receivedError;
+
+            // Combine and sort all results
+            const allMessages = [
+                ...(channelMessages || []),
+                ...(dmMessages || []),
+                ...(receivedDMs || [])
+            ].sort((a, b) =>
+                new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+            ).slice(0, 5);
+
+            return allMessages as MessageWithUser[];
+        } catch (error) {
+            console.error('Search error:', error);
+            return [];
+        }
+    }, [supabase, getPublicUser]);
+
+    const searchChannels = useCallback(async (query: string): Promise<Channel[]> => {
+        console.log('Searching channels for:', query);
+        const { data, error } = await supabase
+            .from('channels')
+            .select('*')
+            .ilike('name', `%${query}%`)
+            .limit(5);
+
+        console.log('Channel search results:', data);
+        if (error) throw error;
+        return data;
+    }, [supabase]);
+
+    const searchUsers = useCallback(async (query: string): Promise<User[]> => {
+        console.log('Searching users for:', query);
+        const { data, error } = await supabase
+            .from('users')
+            .select('*')
+            .ilike('username', `%${query}%`)
+            .limit(5);
+
+        console.log('User search results:', data);
+        if (error) throw error;
+        return data as User[];
     }, [supabase]);
 
     return {
@@ -500,6 +641,13 @@ export const useSupabase = () => {
         updateUserStatus,
         getUsers,
         uploadFile,
-        subscribeToDirectMessages
+        subscribeToDirectMessages,
+        getChannel,
+        getUser,
+        getMessage,
+        getDMContext,
+        searchMessages,
+        searchChannels,
+        searchUsers,
     };
 }; 

@@ -25,6 +25,8 @@ import { CreateChannelDialog } from "@/components/create-channel-dialog"
 import { useSupabase } from "@/hooks/use-supabase-actions"
 import { ThreadHeader } from "@/components/thread-header"
 import { User, Channel, MessageWithUser } from '@/lib/types/chat.types'
+import { useParams, useRouter, useSearchParams } from 'next/navigation'
+import { CommandSearch } from '@/components/command-search'
 
 interface MessageTarget {
   channelId?: string;
@@ -33,27 +35,55 @@ interface MessageTarget {
 }
 
 export default function Home() {
+  const params = useParams();
+  const router = useRouter();
+  const searchParams = useSearchParams()
   const [open, setOpen] = useState(false)
   const [selectedThread, setSelectedThread] = useState<string | null>(null)
   const [currentChannel, setCurrentChannel] = useState<Channel | null>(null)
   const [selectedUser, setSelectedUser] = useState<User | null>(null)
   const [parentMessage, setParentMessage] = useState<MessageWithUser | null>(null)
-  const { getChannelMessages, getDirectMessages } = useSupabase()
+  const { getChannelMessages, getDirectMessages, getChannel, getUser, getMessage, getDMContext } = useSupabase()
+
+  // Add URL state management
+  const updateUrl = (params: { channelId?: string; userId?: string; messageId?: string }) => {
+    const url = new URLSearchParams();
+    if (params.channelId) url.set('channelId', params.channelId);
+    if (params.userId) url.set('userId', params.userId);
+    if (params.messageId) url.set('messageId', params.messageId);
+    router.push(`/?${url.toString()}`, { scroll: false });
+  };
 
   const handleChannelSelect = (channel: Channel) => {
-    setCurrentChannel(channel)
-    setSelectedUser(null)     // Reset DM user when changing to channel
-    setSelectedThread(null)   // Reset thread when changing channels
-  }
+    setCurrentChannel(channel);
+    setSelectedUser(null);
+    setSelectedThread(null);
+    updateUrl({ channelId: channel.id });
+  };
 
   const handleUserSelect = (user: User) => {
-    setSelectedUser(user)
-    setCurrentChannel(null)   // Reset channel when switching to DM
-    setSelectedThread(null)   // Reset thread when switching
-  }
+    setSelectedUser(user);
+    setCurrentChannel(null);
+    setSelectedThread(null);
+    updateUrl({ userId: user.id });
+  };
 
   const handleThreadSelect = async (messageId: string) => {
     setSelectedThread(messageId);
+
+    // Keep the current context in the URL
+    const urlParams: { channelId?: string; userId?: string; messageId: string } = {
+      messageId
+    };
+
+    if (currentChannel) {
+      urlParams.channelId = currentChannel.id;
+    } else if (selectedUser) {
+      urlParams.userId = selectedUser.id;
+    }
+
+    updateUrl(urlParams);
+
     try {
       let messages;
       if (currentChannel) {
@@ -70,6 +100,19 @@ export default function Home() {
       }
     } catch (error) {
       console.error('Error fetching thread:', error);
+    }
+  };
+
+  const handleThreadClose = () => {
+    setSelectedThread(null);
+    setParentMessage(null);
+    // Update URL to remove messageId but keep current context
+    if (currentChannel) {
+      updateUrl({ channelId: currentChannel.id });
+    } else if (selectedUser) {
+      updateUrl({ userId: selectedUser.id });
+    } else {
+      updateUrl({});
     }
   };
 
@@ -105,6 +148,109 @@ export default function Home() {
     return {};
   };
 
+  // Add effect to handle initial route
+  useEffect(() => {
+    const initializeFromUrl = async () => {
+      try {
+        // Get route parameters
+        const channelId = searchParams.get('channelId')
+        const userId = searchParams.get('userId')
+        const messageId = searchParams.get('messageId')
+
+        if (messageId) {
+          // Load message and its context first
+          const message = await getMessage(messageId);
+          if (message) {
+            if (message.channel_id) {
+              const channel = await getChannel(message.channel_id);
+              if (channel) {
+                setCurrentChannel(channel);
+                setSelectedUser(null);
+              }
+            } else {
+              // Try to find DM context
+              const dmContext = await getDMContext(message.id);
+              if (dmContext) {
+                const user = await getUser(dmContext.sender_id === message.user_id ? dmContext.receiver_id : dmContext.sender_id);
+                if (user) {
+                  setSelectedUser(user);
+                  setCurrentChannel(null);
+                }
+              }
+            }
+            setSelectedThread(messageId);
+            setParentMessage(message as MessageWithUser);
+          }
+        } else if (channelId) {
+          const channel = await getChannel(channelId);
+          if (channel) {
+            setCurrentChannel(channel);
+            setSelectedUser(null);
+            setSelectedThread(null);
+          }
+        } else if (userId) {
+          const user = await getUser(userId);
+          if (user) {
+            setSelectedUser(user);
+            setCurrentChannel(null);
+            setSelectedThread(null);
+          }
+        }
+      } catch (error) {
+        console.error('Error initializing from URL:', error);
+      }
+    };
+
+    initializeFromUrl();
+  }, [searchParams]);
+
+  const handleSearchSelect = (result: { type: string; id: string }) => {
+    switch (result.type) {
+      case 'channel':
+        getChannel(result.id).then(channel => {
+          if (channel) handleChannelSelect(channel);
+        });
+        break;
+      case 'message':
+        getMessage(result.id).then(async message => {
+          if (message) {
+            // First set the correct context (channel or DM)
+            if (message.channel_id) {
+              const channel = await getChannel(message.channel_id);
+              if (channel) handleChannelSelect(channel);
+            } else {
+              const dmContext = await getDMContext(message.id);
+              if (dmContext) {
+                const otherUserId = dmContext.sender_id === message.user_id
+                  ? dmContext.receiver_id
+                  : dmContext.sender_id;
+                const user = await getUser(otherUserId);
+                if (user) handleUserSelect(user);
+              }
+            }
+
+            // Wait a bit for the context to be set and messages to load
+            setTimeout(() => {
+              // Find and scroll to the message
+              const messageElement = document.getElementById(`message-${message.id}`);
+              if (messageElement) {
+                messageElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                messageElement.classList.add('highlight-message');
+                setTimeout(() => messageElement.classList.remove('highlight-message'), 2000);
+              }
+            }, 500);
+          }
+        });
+        break;
+      case 'user':
+        getUser(result.id).then(user => {
+          if (user) handleUserSelect(user);
+        });
+        break;
+    }
+    setOpen(false);
+  };
+
   return (
     <div className="flex flex-col h-screen w-full">
       {/* Header - simplified with icon */}
@@ -126,20 +272,11 @@ export default function Home() {
       </header>
 
       {/* CommandDialog remains the same but moves outside header */}
-      <CommandDialog open={open} onOpenChange={setOpen}>
-        <CommandInput placeholder="Search channels and messages..." />
-        <CommandList>
-          <CommandEmpty>No results found.</CommandEmpty>
-          <CommandGroup heading="Channels">
-            <CommandItem># general</CommandItem>
-            <CommandItem># random</CommandItem>
-          </CommandGroup>
-          <CommandGroup heading="Messages">
-            <CommandItem>Message from John</CommandItem>
-            <CommandItem>Message from Sarah</CommandItem>
-          </CommandGroup>
-        </CommandList>
-      </CommandDialog>
+      <CommandSearch
+        open={open}
+        onOpenChange={setOpen}
+        onSelect={handleSearchSelect}
+      />
 
       {/* Main content area with sidebar */}
       <div className="flex flex-1 min-h-0">
@@ -224,10 +361,7 @@ export default function Home() {
               {selectedThread && (
                 <div className="w-96 border-l flex flex-col">
                   <ThreadHeader
-                    onClose={() => {
-                      setSelectedThread(null);
-                      setParentMessage(null);
-                    }}
+                    onClose={handleThreadClose}
                     parentMessage={parentMessage}
                   />
                   <div className="flex-1 flex flex-col min-h-0">
