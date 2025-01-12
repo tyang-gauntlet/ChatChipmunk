@@ -154,7 +154,7 @@ export const useSupabase = () => {
                 throw error;
             }
 
-            return data as MessageWithUser[];
+            return data as unknown as MessageWithUser[];
         } catch (error) {
             console.error('Error fetching messages:', error);
             throw error;
@@ -188,8 +188,6 @@ export const useSupabase = () => {
             const user = await getPublicUser();
             if (!user) throw new Error('User not found');
 
-            console.log('Sending message with user:', user); // Debug log
-
             const messageData = {
                 channel_id: channelId,
                 content,
@@ -212,7 +210,6 @@ export const useSupabase = () => {
                 throw error;
             }
 
-            console.log('Inserted message:', data); // Debug log
             return data;
         } catch (error) {
             console.error('Error sending message:', error);

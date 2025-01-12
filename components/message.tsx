@@ -11,61 +11,106 @@ import { format } from 'date-fns'
 import { useSupabase } from '@/hooks/use-supabase-actions'
 import MessageAttachment from './message-attachment'
 import { getSupabaseClient } from '@/lib/supabase/client'
-import { Reaction } from '@/lib/types/chat.types'
-import type { Message as MessageType } from '@/lib/types/chat.types'
+import type { MessageWithUser } from '@/lib/types/chat.types'
 
 interface MessageProps {
     message: MessageWithUser;
     onReply: (messageId: string) => void;
 }
 
+type ReactionPayload = {
+    emoji: string;
+    id: string;
+    message_id: string | null;
+    user_id: string | null;
+};
+
 export default function Message({ message, onReply }: MessageProps) {
     if (!message) return null;
 
-    const { id, content, created_at, attachments, user } = message;
+    const { id, content, created_at, attachments, user, threads } = message;
     const [showActions, setShowActions] = useState(false);
-    const [currentReactions, setCurrentReactions] = useState<Reaction[]>([]);
+    const [currentReactions, setCurrentReactions] = useState<ReactionPayload[]>([]);
     const { addReaction, removeReaction } = useSupabase();
 
+    const replyCount = threads?.length || 0;
+
+    const fetchReactions = async () => {
+        const supabase = getSupabaseClient();
+        const { data } = await supabase
+            .from('reactions')
+            .select('*')
+            .eq('message_id', id);
+        if (data) {
+            setCurrentReactions(data);
+        }
+    };
+
     useEffect(() => {
-        const supabase = getSupabaseClient()
+        const supabase = getSupabaseClient();
+        fetchReactions();
+
+        // Subscribe to ALL reaction changes
         const channel = supabase
-            .channel(`public:reactions:${id}`)
-            .on('postgres_changes', {
-                event: '*',
-                schema: 'public',
-                table: 'reactions',
-                filter: `message_id=eq.${id}`
-            }, (payload: any) => {
-                if (payload.eventType === 'INSERT') {
-                    setCurrentReactions(prev => [...prev, payload.new])
-                } else if (payload.eventType === 'DELETE') {
-                    setCurrentReactions(prev => prev.filter(r => r.id !== payload.old.id))
+            .channel(`reactions:${id}`)
+            .on<ReactionPayload>(
+                'postgres_changes',
+                {
+                    event: 'INSERT',
+                    schema: 'public',
+                    table: 'reactions',
+                    filter: `message_id=eq.${id}`
+                },
+                (payload) => {
+                    setCurrentReactions(prev => [...prev, payload.new]);
                 }
-            })
-            .subscribe()
+            )
+            .on<ReactionPayload>(
+                'postgres_changes',
+                {
+                    event: 'DELETE',
+                    schema: 'public',
+                    table: 'reactions',
+                    filter: `message_id=eq.${id}`
+                },
+                (payload) => {
+                    setCurrentReactions(prev => prev.filter(r => r.id !== payload.old.id));
+                }
+            )
+            .subscribe();
 
         return () => {
-            supabase.removeChannel(channel)
-        }
-    }, [id])
+            supabase.removeChannel(channel);
+        };
+    }, [id]);
 
     const handleReaction = async (emoji: string) => {
         try {
-            const existingReaction = currentReactions?.find(r => r.emoji === emoji)
+            const existingReaction = currentReactions.find(r =>
+                r.emoji === emoji
+            );
+
             if (existingReaction) {
-                await removeReaction(existingReaction.id)
-                setCurrentReactions(prev => prev.filter(r => r.id !== existingReaction.id))
+                // Optimistically remove the reaction
+                setCurrentReactions(prev =>
+                    prev.filter(r => r.id !== existingReaction.id)
+                );
+                await removeReaction(existingReaction.id);
             } else {
-                const newReaction = await addReaction(id, emoji)
-                if (newReaction) {
-                    setCurrentReactions(prev => [...prev, newReaction])
-                }
+                const newReaction = await addReaction(id, emoji);
+                // Let the subscription handle the addition
             }
         } catch (error) {
-            console.error('Failed to handle reaction:', error)
+            console.error('Failed to handle reaction:', error);
+            // Revert optimistic update on error
+            fetchReactions();
         }
-    }
+    };
+
+    const groupedReactions = currentReactions.reduce((acc, reaction) => {
+        acc[reaction.emoji] = (acc[reaction.emoji] || 0) + 1;
+        return acc;
+    }, {} as Record<string, number>);
 
     return (
         <div
@@ -93,36 +138,37 @@ export default function Message({ message, onReply }: MessageProps) {
 
                 {attachments && Array.isArray(attachments) && attachments.length > 0 && (
                     <div className="flex flex-col gap-2 mt-2">
-                        {attachments.map((attachment: any) => (
+                        {attachments.map((attachment) => (
                             <MessageAttachment
-                                key={attachment?.id}
-                                attachment={attachment}
+                                key={(attachment as any).url}
+                                attachment={attachment as { url: string; file_name: string; file_type: string; }}
                             />
                         ))}
                     </div>
                 )}
 
                 {/* Reactions */}
-                {/* {currentReactions?.length > 0 && (
+                {currentReactions?.length > 0 && (
                     <div className="flex flex-wrap gap-1 mt-2">
-                        {currentReactions.map((reaction) => (
-                            <div key={reaction.id} className="flex flex-col items-center">
+                        {Object.entries(groupedReactions).map(([emoji, count]) => (
+                            <div
+                                key={emoji}
+                                className="flex flex-col items-center"
+                            >
                                 <button
                                     className="flex items-center gap-1 bg-accent rounded-full px-2 py-1 hover:bg-accent/80"
-                                    onClick={() => handleReaction(reaction.emoji)}
+                                    onClick={() => handleReaction(emoji)}
                                 >
-                                    <span>{reaction.emoji}</span>
+                                    <span>{emoji}</span>
+                                    <span className="text-xs">{count}</span>
                                 </button>
-                                <span className="text-[10px] text-muted-foreground mt-0.5">
-                                    {reaction.user_id?.length || 0}
-                                </span>
                             </div>
                         ))}
                     </div>
-                )} */}
+                )}
 
                 {/* Reply Count */}
-                {/* {replyCount > 0 && (
+                {replyCount > 0 && (
                     <div className="flex items-center gap-1 text-xs text-muted-foreground mt-2">
                         <button
                             className="flex items-center gap-1 hover:text-foreground"
@@ -135,7 +181,7 @@ export default function Message({ message, onReply }: MessageProps) {
                             </span>
                         </button>
                     </div>
-                )} */}
+                )}
             </div>
 
             {showActions && (
