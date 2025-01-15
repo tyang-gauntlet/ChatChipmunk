@@ -172,7 +172,11 @@ function HomeContent() {
               // Try to find DM context
               const dmContext = await getDMContext(message.id);
               if (dmContext) {
-                const user = await getUser(dmContext.sender_id === message.user_id ? dmContext.receiver_id : dmContext.sender_id);
+                const senderId = dmContext.sender_id;
+                const receiverId = dmContext.receiver_id;
+                if (!senderId || !receiverId) throw new Error('No sender or receiver found');
+
+                const user = await getUser(senderId === message.user_id ? receiverId : senderId);
                 if (user) {
                   setSelectedUser(user);
                   setCurrentChannel(null);
@@ -229,6 +233,8 @@ function HomeContent() {
                   const otherUserId = dmContext.sender_id === currentUser.id
                     ? dmContext.receiver_id
                     : dmContext.sender_id;
+
+                  if (!otherUserId) throw new Error('No other user found');
 
                   const otherUser = await getUser(otherUserId);
                   if (otherUser) handleUserSelect(otherUser);

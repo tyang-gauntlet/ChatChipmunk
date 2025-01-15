@@ -359,13 +359,14 @@ export const useSupabase = () => {
     const updateUserStatus = useCallback(async (status: 'online' | 'offline') => {
         try {
             const user = await getPublicUser();
+            if (!user) throw new Error('No user found');
 
             const { error } = await supabase
                 .from('users')
                 .update({
                     status,
                 })
-                .eq('id', user?.id)
+                .eq('id', user.id)
 
             if (error) throw error
         } catch (error) {
@@ -377,11 +378,11 @@ export const useSupabase = () => {
     const getUsers = useCallback(async (): Promise<User[]> => {
         try {
             const user = await getPublicUser();
-
+            if (!user) throw new Error('No user found');
             const { data: users, error } = await supabase
                 .from('users')
                 .select('*')
-                .neq('id', user?.id) // Don't include current user
+                .neq('id', user.id) // Don't include current user
 
             if (error) {
                 console.error('Error fetching users:', error)
@@ -576,13 +577,14 @@ export const useSupabase = () => {
             if (dmError) throw dmError;
             if (receivedError) throw receivedError;
 
+
             // Combine and sort all results
             const allMessages = [
                 ...(channelMessages || []),
                 ...(dmMessages || []),
                 ...(receivedDMs || [])
             ].sort((a, b) =>
-                new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+                new Date(b.created_at || '').getTime() - new Date(a.created_at || '').getTime()
             ).slice(0, 5);
 
             return allMessages as MessageWithUser[];
