@@ -32,15 +32,15 @@ export function AICommand({ open, onOpenChange }: AICommandProps) {
 
         try {
             // In your frontend code where you make the API call
-            const API_URL = 'http://44.204.108.174';
+            const API_URL = 'http://44.204.108.174:8000';
 
-            // Test health endpoint first
-            const healthCheck = await fetch(API_URL + '/health');
+            // Use proxied endpoints
+            const healthCheck = await fetch('/api/health');
             if (!healthCheck.ok) {
                 throw new Error('API endpoint is not healthy');
             }
 
-            const response = await fetch(API_URL + '/chat', {
+            const response = await fetch('/api/chat', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
