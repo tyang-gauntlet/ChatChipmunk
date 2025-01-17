@@ -78,7 +78,7 @@ export function AICommand({ open, onOpenChange }: AICommandProps) {
                             </div>
                             <div>
                                 <span className="font-mono text-muted-foreground">/file</span>
-                                <span className="text-muted-foreground"> Ask about a file</span>
+                                <span className="text-muted-foreground"> Ask about a file (coming soon)</span>
                             </div>
                             <div>
                                 <span className="font-mono text-muted-foreground">/fake</span>
