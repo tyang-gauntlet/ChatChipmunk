@@ -17,6 +17,8 @@ import { ThreadHeader } from "@/components/thread-header"
 import { User, Channel, MessageWithUser } from '@/lib/types/chat.types'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { CommandSearch } from '@/components/command-search'
+import { SparkleButton } from '@/components/sparkle-button'
+import { AICommand } from '@/components/ai-command'
 
 interface MessageTarget {
     channelId?: string;
@@ -27,6 +29,8 @@ interface MessageTarget {
 export function HomeContent() {
     const router = useRouter();
     const searchParams = useSearchParams()
+    const [searchOpen, setSearchOpen] = useState(false)
+    const [aiCommandOpen, setAiCommandOpen] = useState(false)
     const [open, setOpen] = useState(false)
     const [selectedThread, setSelectedThread] = useState<string | null>(null)
     const [currentChannel, setCurrentChannel] = useState<Channel | null>(null)
@@ -247,11 +251,12 @@ export function HomeContent() {
             <header className="border-b h-14 flex items-center px-6 justify-between bg-background z-10 w-full">
                 <h1 className="font-semibold">ChatChipmunk</h1>
                 <div className="flex items-center gap-4">
+                    <SparkleButton onClick={() => setAiCommandOpen(true)} />
                     <Button
                         variant="ghost"
                         size="icon"
                         className="w-8 h-8"
-                        onClick={() => setOpen(true)}
+                        onClick={() => setSearchOpen(true)}
                     >
                         <Search className="h-4 w-4" />
                         <span className="sr-only">Search</span>
@@ -261,9 +266,14 @@ export function HomeContent() {
                 </div>
             </header>
 
+            <AICommand
+                open={aiCommandOpen}
+                onOpenChange={setAiCommandOpen}
+            />
+
             <CommandSearch
-                open={open}
-                onOpenChange={setOpen}
+                open={searchOpen}
+                onOpenChange={setSearchOpen}
                 onSelect={handleSearchSelect}
             />
 
