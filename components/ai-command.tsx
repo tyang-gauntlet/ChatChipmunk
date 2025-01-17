@@ -33,7 +33,7 @@ export function AICommand({ open, onOpenChange }: AICommandProps) {
         try {
             // In your frontend code where you make the API call
             const API_URL = process.env.NODE_ENV === 'production'
-                ? 'http://44.204.108.174:8000'  // Force HTTP in production
+                ? 'https://44.204.108.174:8000'  // Force HTTP in production
                 : 'http://localhost:8000';       // Local development
             const response = await fetch(API_URL + '/chat', {
                 method: 'POST',
