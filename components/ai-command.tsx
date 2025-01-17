@@ -4,15 +4,12 @@ import { useState } from 'react'
 import {
     CommandDialog,
     CommandEmpty,
-    CommandGroup,
     CommandInput,
-    CommandItem,
     CommandList,
 } from "@/components/ui/command"
 import { Card, CardContent } from "@/components/ui/card"
 import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { Loader2, X } from 'lucide-react'
-import { Button } from "@/components/ui/button"
 
 interface AICommandProps {
     open: boolean;
@@ -56,12 +53,6 @@ export function AICommand({ open, onOpenChange }: AICommandProps) {
         } finally {
             setIsLoading(false);
         }
-    };
-
-    const handleResponseClose = () => {
-        setShowResponse(false);
-        setResponse(null);
-        setInput('');
     };
 
     return (
