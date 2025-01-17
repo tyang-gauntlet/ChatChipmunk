@@ -31,7 +31,7 @@ export function AICommand({ open, onOpenChange }: AICommandProps) {
         setShowResponse(true); // Open response dialog
 
         try {
-            const response = await fetch('http://44.204.108.174:8000/chat', {
+            const response = await fetch('https://44.204.108.174:8000/chat', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
