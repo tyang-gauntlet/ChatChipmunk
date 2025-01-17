@@ -31,9 +31,6 @@ export function AICommand({ open, onOpenChange }: AICommandProps) {
         setShowResponse(true); // Open response dialog
 
         try {
-            // In your frontend code where you make the API call
-            const API_URL = 'http://44.204.108.174:8000';
-
             // Use proxied endpoints
             const healthCheck = await fetch('/api/health');
             if (!healthCheck.ok) {
